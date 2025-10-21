@@ -1,5 +1,6 @@
 'use client'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import AddFriendModal from '@/components/AddFriendModal'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -13,7 +14,6 @@ export default function ChatPage() {
   const [profileError, setProfileError] = useState('')
   const [isCheckingProfile, setIsCheckingProfile] = useState(true)
   const [userUid, setUserUid] = useState(null)
-  const [showCopied, setShowCopied] = useState(false)
   const buttonRef = useRef(null)
   const { user } = useAuth()
 
@@ -150,18 +150,6 @@ export default function ChatPage() {
     }
   }, [isModalOpen])
 
-  const handleCopyUid = async () => {
-    if (userUid) {
-      try {
-        await navigator.clipboard.writeText(userUid.toString())
-        setShowCopied(true)
-        setTimeout(() => setShowCopied(false), 2000)
-      } catch (err) {
-        console.error('Failed to copy UID:', err)
-      }
-    }
-  }
-
   const handleSendRequest = () => {
     console.log('Send Friend Request clicked')
   }
@@ -200,72 +188,14 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Add Friend Modal - outside blurred container */}
-        {isModalOpen && (
-          <>
-            {/* Backdrop - transparent overlay for click outside */}
-            <div 
-              className="fixed inset-0 z-40 animate-fadeIn"
-              onClick={closeModal}
-            />
-            
-            {/* Modal - positioned absolutely with slide-up/down animation */}
-            <div 
-              className={`fixed bg-white border-2 border-black rounded-xl w-[280px] p-6 shadow-2xl z-50 ${isModalClosing ? 'animate-slideDown' : 'animate-slideUp'}`}
-              style={{ 
-                left: `${modalPosition.left - 28}px`,
-                bottom: `${modalPosition.bottom}px`
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Close Button */}
-              <button 
-                onClick={closeModal}
-                className="absolute top-2 right-2 text-xl text-black hover:scale-110 transition-transform cursor-pointer"
-                aria-label="Close modal"
-              >
-                ×
-              </button>
-
-              {/* Title */}
-              <h2 className="text-xl font-bold mb-3 text-black">Add Friend</h2>
-
-              {/* Your ID Section */}
-              {userUid && (
-                <div className="mb-4 p-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <div className="text-xs text-gray-600 mb-1">Your ID</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-mono font-bold text-black">{userUid.toString().padStart(8, '0')}</span>
-                    <button
-                      onClick={handleCopyUid}
-                      className="ml-2 px-3 py-1 bg-black text-white text-xs rounded hover:bg-gray-800 transition-colors"
-                    >
-                      {showCopied ? '✓ Copied' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Option 1: Send Friend Request */}
-              <button 
-                onClick={handleSendRequest}
-                className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left"
-              >
-                <div className="font-bold text-[15px] text-black">Send Friend Request</div>
-                <div className="text-[13px] text-gray-600">Search by 8-digit ID</div>
-              </button>
-
-              {/* Option 2: View Friend Requests */}
-              <button 
-                onClick={handleViewRequests}
-                className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left mt-3"
-              >
-                <div className="font-bold text-[15px] text-black">Friend Requests</div>
-                <div className="text-[13px] text-gray-600">View pending requests</div>
-              </button>
-            </div>
-          </>
-        )}
+        {/* Add Friend Modal */}
+        <AddFriendModal
+          isOpen={isModalOpen}
+          isClosing={isModalClosing}
+          onClose={closeModal}
+          position={modalPosition}
+          userUid={userUid}
+        />
 
         {/* Name Input Popup - Blocking Modal */}
         {showNamePopup && (
