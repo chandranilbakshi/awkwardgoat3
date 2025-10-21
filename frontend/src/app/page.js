@@ -1,83 +1,139 @@
-"use client";
-import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+'use client'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import { useState, useEffect, useRef } from 'react'
 
-export default function HomePage() {
-  const { user, loading, logout, isAuthenticated } = useAuth();
-  const router = useRouter();
+export default function ChatPage() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isModalClosing, setIsModalClosing] = useState(false)
+  const [modalPosition, setModalPosition] = useState({ left: 0, bottom: 0 })
+  const buttonRef = useRef(null)
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push("/signup");
+  const openModal = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setModalPosition({
+        left: rect.left + rect.width / 2,
+        bottom: window.innerHeight - rect.top + 16
+      })
     }
-  }, [loading, isAuthenticated, router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
+    setIsModalClosing(false)
+    setIsModalOpen(true)
+    document.body.style.overflow = 'hidden'
   }
 
-  if (!isAuthenticated) {
-    return null;
+  const closeModal = () => {
+    setIsModalClosing(true)
+    setTimeout(() => {
+      setIsModalOpen(false)
+      setIsModalClosing(false)
+      document.body.style.overflow = 'unset'
+    }, 250) // Match animation duration
+  }
+
+  // ESC key handler
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        closeModal()
+      }
+    }
+    
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'unset' // Cleanup on unmount
+    }
+  }, [isModalOpen])
+
+  const handleSendRequest = () => {
+    console.log('Send Friend Request clicked')
+  }
+
+  const handleViewRequests = () => {
+    console.log('View Friend Requests clicked')
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Welcome to Athena</h1>
+    <ProtectedRoute>
+      <div className="container min-h-screen bg-white p-1 flex mx-auto">
+        <div className="flex w-full gap-2">
+          {/* Chat List Box */}
+          <div className="relative w-100 bg-white border border-black rounded-2xl p-4 flex flex-col">
+            <h2 className="text-xl font-bold text-black mb-4">Chats</h2>
+            
+            {/* Empty state */}
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-gray-600">No conversations yet</p>
+            </div>
+
+            {/* Floating + button - no blur */}
             <button
-              onClick={logout}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
+              ref={buttonRef}
+              onClick={openModal}
+              className={`absolute bottom-4 left w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
+              aria-label="Add new chat"
             >
-              Logout
+              +
             </button>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
-            <div className="space-y-2">
-              <p>
-                <span className="font-medium">Email:</span>{" "}
-                {user?.email || "Not available"}
-              </p>
-              <p>
-                <span className="font-medium">User ID:</span>{" "}
-                {user?.id || "Not available"}
-              </p>
-              <p>
-                <span className="font-medium">Created:</span>{" "}
-                {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString()
-                  : "Not available"}
-              </p>
-              <p>
-                <span className="font-medium">Last Sign In:</span>{" "}
-                {user?.last_sign_in_at
-                  ? new Date(user.last_sign_in_at).toLocaleString()
-                  : "Not available"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-800">
-              ✅ You are authenticated! Your session is being maintained automatically.
-            </p>
-            <p className="text-sm text-green-600 mt-2">
-              Refresh this page - you won't need to log in again!
-            </p>
+          {/* Active Chat Box */}
+          <div className="flex-1 bg-white border border-black rounded-2xl p-4 flex items-center justify-center">
+            <p className="text-sm text-gray-600">Select a chat to start messaging</p>
           </div>
         </div>
+
+        {/* Add Friend Modal - outside blurred container */}
+        {isModalOpen && (
+          <>
+            {/* Backdrop - transparent overlay for click outside */}
+            <div 
+              className="fixed inset-0 z-40 animate-fadeIn"
+              onClick={closeModal}
+            />
+            
+            {/* Modal - positioned absolutely with slide-up/down animation */}
+            <div 
+              className={`fixed bg-white border-2 border-black rounded-xl w-[280px] p-6 shadow-2xl z-50 ${isModalClosing ? 'animate-slideDown' : 'animate-slideUp'}`}
+              style={{ 
+                left: `${modalPosition.left - 28}px`,
+                bottom: `${modalPosition.bottom}px`
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={closeModal}
+                className="absolute top-2 right-2 text-xl text-black hover:scale-110 transition-transform cursor-pointer"
+                aria-label="Close modal"
+              >
+                ×
+              </button>
+
+              {/* Title */}
+              <h2 className="text-xl font-bold mb-4 text-black">Add Friend</h2>
+
+              {/* Option 1: Send Friend Request */}
+              <button 
+                onClick={handleSendRequest}
+                className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="font-bold text-[15px] text-black">Send Friend Request</div>
+                <div className="text-[13px] text-gray-600">Search by 8-digit ID</div>
+              </button>
+
+              {/* Option 2: View Friend Requests */}
+              <button 
+                onClick={handleViewRequests}
+                className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left mt-3"
+              >
+                <div className="font-bold text-[15px] text-black">Friend Requests</div>
+                <div className="text-[13px] text-gray-600">View pending requests</div>
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </div>
-  );
+    </ProtectedRoute>
+  )
 }

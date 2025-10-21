@@ -51,7 +51,7 @@ export default function AuthCallbackPage() {
         setStatus("Authentication successful! Redirecting...");
         
         // Redirect to chat page
-        setTimeout(() => router.push("/chat"), 1500);
+        setTimeout(() => router.push("/"), 1500);
       } else {
         setStatus("No authentication token found. Redirecting...");
         setTimeout(() => router.push("/signup"), 2000);
