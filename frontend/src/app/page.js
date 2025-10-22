@@ -1,5 +1,4 @@
 'use client'
-import ProtectedRoute from '@/components/ProtectedRoute'
 import AddFriendModal from '@/components/AddFriendModal'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -14,7 +13,10 @@ export default function ChatPage() {
   const [profileError, setProfileError] = useState('')
   const [isCheckingProfile, setIsCheckingProfile] = useState(true)
   const [userUid, setUserUid] = useState(null)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(400) // Initial width in pixels
+  const [isResizing, setIsResizing] = useState(false)
   const buttonRef = useRef(null)
+  const containerRef = useRef(null)
   const { user } = useAuth()
 
   // Check if user profile exists on mount
@@ -150,20 +152,55 @@ export default function ChatPage() {
     }
   }, [isModalOpen])
 
-  const handleSendRequest = () => {
-    console.log('Send Friend Request clicked')
+  // Resize handler
+  const handleMouseDown = (e) => {
+    setIsResizing(true)
+    e.preventDefault()
   }
 
-  const handleViewRequests = () => {
-    console.log('View Friend Requests clicked')
-  }
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing || !containerRef.current) return
+      
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const newWidth = e.clientX - containerRect.left
+      
+      // Set min and max widths (e.g., 250px to 600px)
+      const minWidth = 250
+      const maxWidth = 600
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setLeftPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
 
   return (
-    <ProtectedRoute>
       <div className="container min-h-screen bg-white p-1 flex mx-auto">
-        <div className="flex w-full gap-2">
+        <div ref={containerRef} className="flex w-full relative">
           {/* Chat List Box */}
-          <div className="relative w-100 bg-white border border-black rounded-2xl p-4 flex flex-col">
+          <div 
+            className="bg-white border border-black rounded-2xl p-4 flex flex-col"
+            style={{ width: `${leftPanelWidth}px`, minWidth: '300px' }}
+          >
             <h2 className="text-xl font-bold text-black mb-4">Chats</h2>
             
             {/* Empty state */}
@@ -181,6 +218,13 @@ export default function ChatPage() {
               +
             </button>
           </div>
+
+          {/* Resizable Divider */}
+          <div
+            onMouseDown={handleMouseDown}
+            className={`w-1 hover:w-2 bg-transparent hover:bg-gray-300 cursor-col-resize transition-all ${isResizing ? 'w-2 bg-gray-400' : ''}`}
+            style={{ minWidth: '4px' }}
+          />
 
           {/* Active Chat Box */}
           <div className="flex-1 bg-white border border-black rounded-2xl p-4 flex items-center justify-center">
@@ -257,6 +301,5 @@ export default function ChatPage() {
           </div>
         )}
       </div>
-    </ProtectedRoute>
   )
 }

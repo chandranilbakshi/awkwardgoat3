@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -239,7 +238,7 @@ func handleCheckProfile(c *fiber.Ctx) error {
 	}
 
 	req.Header.Set("apikey", supabaseKey)
-	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -255,7 +254,6 @@ func handleCheckProfile(c *fiber.Ctx) error {
 
 	result := fiber.Map{
 		"exists": len(profiles) > 0,
-		"userId": user.ID.String(),
 	}
 
 	// If profile exists, include the UID
@@ -329,7 +327,7 @@ func handleCreateProfile(c *fiber.Ctx) error {
 	}
 
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", "Bearer "+token)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(httpReq)
@@ -402,7 +400,7 @@ func handleSearchByUID(c *fiber.Ctx) error {
 	supabaseKey := os.Getenv("SUPABASE_KEY")
 
 	// Query user_profiles table by UID
-	httpReq, err := http.NewRequest("GET", supabaseURL+"/rest/v1/user_profiles?uid=eq."+uid+"&select=id,name,uid", nil)
+	httpReq, err := http.NewRequest("GET", supabaseURL+"/rest/v1/user_profiles?uid=eq."+uid+"&select=id,name", nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to search user",
@@ -410,7 +408,7 @@ func handleSearchByUID(c *fiber.Ctx) error {
 	}
 
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -445,14 +443,13 @@ func handleSearchByUID(c *fiber.Ctx) error {
 		"user": fiber.Map{
 			"id":   profiles[0]["id"],
 			"name": profiles[0]["name"],
-			"uid":  profiles[0]["uid"],
 		},
 	})
 }
 
 func handleSendFriendRequest(c *fiber.Ctx) error {
 	type SendRequestBody struct {
-		ReceiverUID int `json:"receiver_uid"`
+		ReceiverID string `json:"receiver_id"`
 	}
 
 	var req SendRequestBody
@@ -462,9 +459,9 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.ReceiverUID == 0 {
+	if req.ReceiverID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Receiver UID is required",
+			"error": "Receiver ID is required",
 		})
 	}
 
@@ -495,81 +492,16 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	supabaseKey := os.Getenv("SUPABASE_KEY")
 
-	// Get sender's profile to get their UID
-	httpReq, err := http.NewRequest("GET", supabaseURL+"/rest/v1/user_profiles?id=eq."+user.ID.String()+"&select=uid", nil)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get sender profile",
-		})
-	}
-
-	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
-
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		log.Printf("Error querying sender profile: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get sender profile",
-		})
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	var senderProfiles []map[string]interface{}
-	json.Unmarshal(body, &senderProfiles)
-
-	if len(senderProfiles) == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Sender profile not found",
-		})
-	}
-
-	senderUID := int(senderProfiles[0]["uid"].(float64))
-
 	// Check if trying to send request to self
-	if senderUID == req.ReceiverUID {
+	if user.ID.String() == req.ReceiverID {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Cannot send friend request to yourself",
 		})
 	}
 
-	// Get receiver's user ID from UID
-	receiverUIDStr := fmt.Sprintf("%d", req.ReceiverUID)
-	httpReq, err = http.NewRequest("GET", supabaseURL+"/rest/v1/user_profiles?uid=eq."+receiverUIDStr+"&select=id", nil)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get receiver profile",
-		})
-	}
-
-	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
-
-	resp, err = http.DefaultClient.Do(httpReq)
-	if err != nil {
-		log.Printf("Error querying receiver profile: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get receiver profile",
-		})
-	}
-	defer resp.Body.Close()
-
-	body, _ = io.ReadAll(resp.Body)
-	var receiverProfiles []map[string]interface{}
-	json.Unmarshal(body, &receiverProfiles)
-
-	if len(receiverProfiles) == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Receiver not found",
-		})
-	}
-
-	receiverID := receiverProfiles[0]["id"].(string)
-
 	// Check for existing friend request or friendship
-	checkURL := supabaseURL + "/rest/v1/friend_requests?or=(and(sender_id.eq." + user.ID.String() + ",receiver_id.eq." + receiverID + "),and(sender_id.eq." + receiverID + ",receiver_id.eq." + user.ID.String() + "))&select=*"
-	httpReq, err = http.NewRequest("GET", checkURL, nil)
+	checkURL := supabaseURL + "/rest/v1/friend_requests?or=(and(from_user_id.eq." + user.ID.String() + ",to_user_id.eq." + req.ReceiverID + "),and(from_user_id.eq." + req.ReceiverID + ",to_user_id.eq." + user.ID.String() + "))&select=*"
+	httpReq, err := http.NewRequest("GET", checkURL, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to check existing requests",
@@ -577,9 +509,9 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 	}
 
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err = http.DefaultClient.Do(httpReq)
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		log.Printf("Error checking existing requests: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -588,7 +520,7 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ = io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	var existingRequests []map[string]interface{}
 	json.Unmarshal(body, &existingRequests)
 
@@ -607,9 +539,9 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 
 	// Create friend request
 	requestData := map[string]interface{}{
-		"sender_id":   user.ID.String(),
-		"receiver_id": receiverID,
-		"status":      "pending",
+		"from_user_id": user.ID.String(),
+		"to_user_id":   req.ReceiverID,
+		"status":       "pending",
 	}
 
 	jsonData, _ := json.Marshal(requestData)
@@ -622,30 +554,30 @@ func handleSendFriendRequest(c *fiber.Ctx) error {
 	}
 
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", "Bearer "+token)
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Prefer", "return=representation")
 
-	resp, err = http.DefaultClient.Do(httpReq)
+	resp2, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		log.Printf("Error creating friend request: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to create friend request",
 		})
 	}
-	defer resp.Body.Close()
+	defer resp2.Body.Close()
 
-	body, _ = io.ReadAll(resp.Body)
+	body2, _ := io.ReadAll(resp2.Body)
 
-	if resp.StatusCode != 201 {
-		log.Printf("Supabase error: %s", string(body))
-		return c.Status(resp.StatusCode).JSON(fiber.Map{
+	if resp2.StatusCode != 201 {
+		log.Printf("Supabase error: %s", string(body2))
+		return c.Status(resp2.StatusCode).JSON(fiber.Map{
 			"error": "Failed to create friend request",
 		})
 	}
 
 	var createdRequest []map[string]interface{}
-	json.Unmarshal(body, &createdRequest)
+	json.Unmarshal(body2, &createdRequest)
 
 	return c.JSON(fiber.Map{
 		"success": true,
