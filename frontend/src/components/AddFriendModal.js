@@ -10,12 +10,20 @@ export default function AddFriendModal({
   userUid,
 }) {
   const [showCopied, setShowCopied] = useState(false);
-  const [view, setView] = useState("main"); // 'main' or 'search'
+  const [view, setView] = useState("main"); // 'main', 'search', or 'view'
   const [searchUID, setSearchUID] = useState("");
   const [searchResults, setSearchResults] = useState([]); // Array to support up to 2 users
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  
+  // Friend Requests View State
+  const [activeTab, setActiveTab] = useState("received"); // 'sent' or 'received'
+  const [statusFilter, setStatusFilter] = useState("pending"); // 'pending', 'accepted', 'rejected'
+  const [requests, setRequests] = useState([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [requestsOffset, setRequestsOffset] = useState(0);
+  const [hasMoreRequests, setHasMoreRequests] = useState(true);
 
   // Reset view when modal opens/closes
   useEffect(() => {
@@ -25,6 +33,11 @@ export default function AddFriendModal({
       setSearchResults([]);
       setSearchError("");
       setSuccessMessage("");
+      setActiveTab("received");
+      setStatusFilter("pending");
+      setRequests([]);
+      setRequestsOffset(0);
+      setHasMoreRequests(true);
     }
   }, [isOpen]);
 
@@ -148,7 +161,62 @@ export default function AddFriendModal({
   };
 
   const handleViewRequests = () => {
-    console.log("View Friend Requests clicked");
+    setView("view");
+    fetchRequests(0, true); // Fetch initial requests
+  };
+
+  // Fetch friend requests
+  const fetchRequests = async (offset = 0, reset = false) => {
+    setIsLoadingRequests(true);
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      const type = activeTab; // 'sent' or 'received'
+      const status = statusFilter; // 'pending', 'accepted', 'rejected'
+      
+      const response = await fetch(
+        `http://localhost:8080/api/friends/requests?type=${type}&status=${status}&offset=${offset}&limit=5`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const newRequests = data[activeTab] || [];
+        
+        if (reset) {
+          setRequests(newRequests);
+        } else {
+          setRequests((prev) => [...prev, ...newRequests]);
+        }
+        
+        // Check if there are more requests to load
+        setHasMoreRequests(newRequests.length === 5);
+        setRequestsOffset(offset);
+      } else {
+        console.error("Failed to fetch requests:", data.error);
+      }
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
+  // Refetch requests when tab or status filter changes
+  useEffect(() => {
+    if (view === "view") {
+      setRequestsOffset(0);
+      fetchRequests(0, true);
+    }
+  }, [activeTab, statusFilter]);
+
+  const handleLoadMore = () => {
+    const newOffset = requestsOffset + 5;
+    fetchRequests(newOffset, false);
   };
 
   if (!isOpen) return null;
@@ -172,7 +240,7 @@ export default function AddFriendModal({
         <div className="flex justify-between mb-4">
           {/* Title */}
           <h2 className="text-xl font-bold text-black">
-            {view === "main" ? "Add Friend" : "Search Friend"}
+            {view === "main" ? "Add Friend" : view === "search" ? "Search Friend" : "Friend Requests"}
           </h2>
 
           {/* Close Button */}
@@ -329,6 +397,138 @@ export default function AddFriendModal({
                   </p>
                 </div>
               )}
+          </>
+        )}
+
+        {/* View Requests View */}
+        {view === "view" && (
+          <>
+            {/* Back Button */}
+            <button
+              onClick={handleBack}
+              className="mb-3 text-sm text-gray-600 hover:text-black flex items-center"
+            >
+              <ChevronLeft size={20} />
+              Back
+            </button>
+
+            {/* Tabs and Status Filter */}
+            <div className="flex justify-between items-center mb-4">
+              {/* Tabs */}
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveTab("received")}
+                  className={`text-sm font-semibold pb-1 transition-colors ${
+                    activeTab === "received"
+                      ? "text-black border-b-2 border-black"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  Received
+                </button>
+                <button
+                  onClick={() => setActiveTab("sent")}
+                  className={`text-sm font-semibold pb-1 transition-colors ${
+                    activeTab === "sent"
+                      ? "text-black border-b-2 border-black"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  Sent
+                </button>
+              </div>
+
+              {/* Status Dropdown */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              >
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
+            {/* Requests List */}
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {isLoadingRequests && requestsOffset === 0 ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                </div>
+              ) : requests.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-500">No requests found</p>
+                </div>
+              ) : (
+                <>
+                  {requests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="p-3 bg-gray-50 border border-gray-300 rounded-lg"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-black">
+                            {request.user_name}
+                          </div>
+                        </div>
+                        
+                        {/* Status Badge */}
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                            request.status === "pending"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : request.status === "accepted"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {request.status.charAt(0).toUpperCase() +
+                            request.status.slice(1)}
+                        </span>
+                      </div>
+
+                      {/* Action Buttons - Only show for pending received requests */}
+                      {activeTab === "received" &&
+                        request.status === "pending" && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => {
+                                // TODO: Implement accept functionality
+                                console.log("Accept request:", request.id);
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => {
+                                // TODO: Implement reject functionality
+                                console.log("Reject request:", request.id);
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-100 transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  ))}
+
+                  {/* Load More Button */}
+                  {hasMoreRequests && (
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={isLoadingRequests}
+                      className="w-full py-2 text-sm text-gray-600 hover:text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoadingRequests ? "Loading..." : "Load More"}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
