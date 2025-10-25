@@ -2,6 +2,7 @@
 import AddFriendModal from '@/components/AddFriendModal'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { Ellipsis } from 'lucide-react';
 
 export default function ChatPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -15,6 +16,9 @@ export default function ChatPage() {
   const [userUid, setUserUid] = useState(null)
   const [leftPanelWidth, setLeftPanelWidth] = useState(400) // Initial width in pixels
   const [isResizing, setIsResizing] = useState(false)
+  const [friends, setFriends] = useState([])
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false)
+  const [friendsError, setFriendsError] = useState('')
   const buttonRef = useRef(null)
   const containerRef = useRef(null)
   const { user } = useAuth()
@@ -50,8 +54,9 @@ export default function ChatPage() {
             setShowNamePopup(true)
             document.body.style.overflow = 'hidden'
           } else if (data.uid) {
-            // Profile exists, store the UID
+            // Profile exists, store the UID and load friends
             setUserUid(data.uid)
+            loadFriends()
           }
         }
       } catch (error) {
@@ -63,6 +68,42 @@ export default function ChatPage() {
 
     checkUserProfile()
   }, [user])
+
+  // Function to load friends list
+  const loadFriends = async () => {
+    if (!user) return
+
+    setIsLoadingFriends(true)
+    setFriendsError('')
+
+    try {
+      const accessToken = localStorage.getItem('access_token')
+      
+      if (!accessToken) {
+        setFriendsError('Authentication error')
+        return
+      }
+
+      const response = await fetch('http://localhost:8080/api/friends/list', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setFriends(data.friends || [])
+      } else {
+        setFriendsError(data.error || 'Failed to load friends')
+      }
+    } catch (error) {
+      console.error('Error loading friends:', error)
+      setFriendsError('Failed to load friends')
+    } finally {
+      setIsLoadingFriends(false)
+    }
+  }
 
   const handleNameSubmit = async (e) => {
     e.preventDefault()
@@ -103,6 +144,12 @@ export default function ChatPage() {
       // Success! Close popup and allow user to continue
       setShowNamePopup(false)
       document.body.style.overflow = 'unset'
+      
+      // Store UID and load friends
+      if (data.profile && data.profile.uid) {
+        setUserUid(data.profile.uid)
+        loadFriends()
+      }
       
       // Optionally store profile data locally
       localStorage.setItem('user_profile', JSON.stringify(data.profile))
@@ -203,9 +250,39 @@ export default function ChatPage() {
           >
             <h2 className="text-xl font-bold text-black mb-4">Chats</h2>
             
-            {/* Empty state */}
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-gray-600">No conversations yet</p>
+            {/* Friends List */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingFriends ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                  <span className="ml-2 text-sm text-gray-600">Loading friends...</span>
+                </div>
+              ) : friendsError ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-red-600">{friendsError}</p>
+                </div>
+              ) : friends.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-gray-600">No friends yet. Add some friends to start chatting!</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {friends.map((friend, index) => (
+                    <div
+                      key={friend.id || index}
+                      className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors border border-gray-200 hover:border-gray-300"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-black">{friend.name}</h3>
+                          <p className="text-xs text-gray-500">UID: {friend.uid}</p>
+                        </div>
+                        <Ellipsis size={18} className="text-gray-600" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Floating + button - no blur */}
@@ -243,8 +320,8 @@ export default function ChatPage() {
 
         {/* Name Input Popup - Blocking Modal */}
         {showNamePopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
-            <div className="bg-white border-2 border-black rounded-2xl w-[400px] p-8 shadow-2xl">
+          <div className="fixed inset-0 backdrop-blur-xs flex items-center justify-center z-[100]">
+            <div className="bg-white rounded-2xl w-[400px] p-8 shadow-[0_0_50px_rgba(80,80,80,0.5)]">
               <h2 className="text-2xl font-bold mb-2 text-black">Welcome!</h2>
               <p className="text-sm text-gray-600 mb-6">Please enter your full name to continue</p>
               

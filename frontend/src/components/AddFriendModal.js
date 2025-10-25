@@ -219,6 +219,43 @@ export default function AddFriendModal({
     fetchRequests(newOffset, false);
   };
 
+  // Handle managing friend requests (accept/reject)
+  const handleManageFriendRequest = async (requestId, status) => {
+    try {
+      const accessToken = localStorage.getItem("access_token");
+
+      const response = await fetch(
+        "http://localhost:8080/api/friends/manage-request",
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            request_id: requestId,
+            status: status, // "accepted" or "rejected"
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Refresh the requests list to reflect the changes
+        fetchRequests(0, true);
+        
+        // Show success message (optional)
+        console.log(`Friend request ${status} successfully`);
+      } else {
+        console.error("Failed to manage friend request:", data.error);
+        // You could add error state handling here if needed
+      }
+    } catch (error) {
+      console.error("Error managing friend request:", error);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -442,7 +479,7 @@ export default function AddFriendModal({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-400"
+                className="text-xs rounded"
               >
                 <option value="pending">Pending</option>
                 <option value="accepted">Accepted</option>
@@ -495,21 +532,19 @@ export default function AddFriendModal({
                           <div className="flex gap-2 mt-2">
                             <button
                               onClick={() => {
-                                // TODO: Implement accept functionality
-                                console.log("Accept request:", request.id);
+                                handleManageFriendRequest(request.id, "accepted");
                               }}
-                              className="flex-1 px-3 py-1.5 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors"
+                              className="flex-1 px-3 py-1.5 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors flex items-center justify-center gap-1"
                             >
-                              Accept
+                              <Check size={15} /> Accept
                             </button>
                             <button
                               onClick={() => {
-                                // TODO: Implement reject functionality
-                                console.log("Reject request:", request.id);
+                                handleManageFriendRequest(request.id, "rejected");
                               }}
-                              className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-100 transition-colors"
+                              className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-100 transition-colors flex items-center justify-center gap-1"
                             >
-                              Reject
+                              <X size={15} /> Reject
                             </button>
                           </div>
                         )}
