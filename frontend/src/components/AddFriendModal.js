@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Copy, Check, Clipboard, SendHorizonal, ChevronLeft } from "lucide-react";
+import { useApi } from "@/hooks/useApi";
 
 export default function AddFriendModal({
   isOpen,
@@ -24,6 +25,8 @@ export default function AddFriendModal({
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [requestsOffset, setRequestsOffset] = useState(0);
   const [hasMoreRequests, setHasMoreRequests] = useState(true);
+
+  const { apiCall } = useApi();
 
   // Reset view when modal opens/closes
   useEffect(() => {
@@ -54,15 +57,8 @@ export default function AddFriendModal({
 
     const timer = setTimeout(async () => {
       try {
-        const accessToken = localStorage.getItem("access_token");
-
-        const response = await fetch(
-          `http://localhost:8080/api/user/search-by-uid/${searchUID}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
+        const response = await apiCall(
+          `http://localhost:8080/api/user/search-by-uid/${searchUID}`
         );
 
         const data = await response.json();
@@ -125,16 +121,10 @@ export default function AddFriendModal({
 
   const handleSendFriendRequest = async (receiverID) => {
     try {
-      const accessToken = localStorage.getItem("access_token");
-
-      const response = await fetch(
+      const response = await apiCall(
         "http://localhost:8080/api/friends/send-request",
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ receiver_id: receiverID }),
         }
       );
@@ -166,20 +156,14 @@ export default function AddFriendModal({
   };
 
   // Fetch friend requests
-  const fetchRequests = async (offset = 0, reset = false) => {
+  const fetchRequests = useCallback(async (offset = 0, reset = false) => {
     setIsLoadingRequests(true);
     try {
-      const accessToken = localStorage.getItem("access_token");
       const type = activeTab; // 'sent' or 'received'
       const status = statusFilter; // 'pending', 'accepted', 'rejected'
       
-      const response = await fetch(
-        `http://localhost:8080/api/friends/requests?type=${type}&status=${status}&offset=${offset}&limit=5`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
+      const response = await apiCall(
+        `http://localhost:8080/api/friends/requests?type=${type}&status=${status}&offset=${offset}&limit=5`
       );
 
       const data = await response.json();
@@ -204,7 +188,7 @@ export default function AddFriendModal({
     } finally {
       setIsLoadingRequests(false);
     }
-  };
+  }, [activeTab, statusFilter, apiCall]);
 
   // Refetch requests when tab or status filter changes
   useEffect(() => {
@@ -212,7 +196,7 @@ export default function AddFriendModal({
       setRequestsOffset(0);
       fetchRequests(0, true);
     }
-  }, [activeTab, statusFilter]);
+  }, [activeTab, statusFilter, view, fetchRequests]);
 
   const handleLoadMore = () => {
     const newOffset = requestsOffset + 5;
@@ -222,16 +206,10 @@ export default function AddFriendModal({
   // Handle managing friend requests (accept/reject)
   const handleManageFriendRequest = async (requestId, status) => {
     try {
-      const accessToken = localStorage.getItem("access_token");
-
-      const response = await fetch(
+      const response = await apiCall(
         "http://localhost:8080/api/friends/manage-request",
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             request_id: requestId,
             status: status, // "accepted" or "rejected"

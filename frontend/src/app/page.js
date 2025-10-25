@@ -1,7 +1,9 @@
 'use client'
 import AddFriendModal from '@/components/AddFriendModal'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
+import { useApi } from '@/hooks/useApi'
 import { Ellipsis } from 'lucide-react';
 
 export default function ChatPage() {
@@ -21,75 +23,38 @@ export default function ChatPage() {
   const [friendsError, setFriendsError] = useState('')
   const buttonRef = useRef(null)
   const containerRef = useRef(null)
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const { apiCall } = useApi()
 
-  // Check if user profile exists on mount
+  // Redirect to signup if not authenticated
   useEffect(() => {
-    const checkUserProfile = async () => {
-      if (!user) {
-        setIsCheckingProfile(false)
-        return
-      }
-
-      try {
-        const accessToken = localStorage.getItem('access_token')
-        
-        if (!accessToken) {
-          setIsCheckingProfile(false)
-          return
-        }
-
-        // Check if user profile exists via backend
-        const response = await fetch('http://localhost:8080/api/user/check-profile', {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          
-          if (!data.exists) {
-            // No profile found, show name popup
-            setShowNamePopup(true)
-            document.body.style.overflow = 'hidden'
-          } else if (data.uid) {
-            // Profile exists, store the UID and load friends
-            setUserUid(data.uid)
-            loadFriends()
-          }
-        }
-      } catch (error) {
-        console.error('Error checking user profile:', error)
-      } finally {
-        setIsCheckingProfile(false)
-      }
+    if (!loading && !user) {
+      router.push('/signup')
     }
+  }, [user, loading, router])
 
-    checkUserProfile()
-  }, [user])
+  // Don't render anything while loading or if not authenticated
+  if (loading || !user) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Function to load friends list
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
     if (!user) return
 
     setIsLoadingFriends(true)
     setFriendsError('')
 
     try {
-      const accessToken = localStorage.getItem('access_token')
-      
-      if (!accessToken) {
-        setFriendsError('Authentication error')
-        return
-      }
-
-      const response = await fetch('http://localhost:8080/api/friends/list', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      })
-
+      const response = await apiCall('http://localhost:8080/api/friends/list')
       const data = await response.json()
 
       if (response.ok) {
@@ -103,7 +68,48 @@ export default function ChatPage() {
     } finally {
       setIsLoadingFriends(false)
     }
-  }
+  }, [user, apiCall])
+
+  // Check if user profile exists on mount
+  useEffect(() => {
+    const checkUserProfile = async () => {
+      if (!user || loading) {
+        setIsCheckingProfile(false)
+        return
+      }
+
+      try {
+        // Check if user profile exists via backend using API interceptor
+        const response = await apiCall('http://localhost:8080/api/user/check-profile')
+
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (!data.exists) {
+            // No profile found, show name popup
+            setShowNamePopup(true)
+            document.body.style.overflow = 'hidden'
+          } else if (data.uid) {
+            // Profile exists, store the UID
+            setUserUid(data.uid)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user profile:', error)
+      } finally {
+        setIsCheckingProfile(false)
+      }
+    }
+
+    checkUserProfile()
+  }, [user, loading, apiCall])
+
+  // Load friends when userUid is set
+  useEffect(() => {
+    if (userUid) {
+      loadFriends()
+    }
+  }, [userUid, loadFriends])
 
   const handleNameSubmit = async (e) => {
     e.preventDefault()
@@ -117,21 +123,9 @@ export default function ChatPage() {
     setProfileError('')
 
     try {
-      const accessToken = localStorage.getItem('access_token')
-      
-      if (!accessToken) {
-        setProfileError('Authentication error. Please log in again.')
-        setIsCreatingProfile(false)
-        return
-      }
-
-      // Call backend to create profile
-      const response = await fetch('http://localhost:8080/api/user/create-profile', {
+      // Call backend to create profile using API interceptor
+      const response = await apiCall('http://localhost:8080/api/user/create-profile', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ name: fullName.trim() }),
       })
 
