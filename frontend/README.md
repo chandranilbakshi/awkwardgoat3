@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Athena Frontend
 
-## Getting Started
+Next.js 14 frontend with App Router, providing passwordless authentication and friend management UI.
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Modern React application built with **Next.js 14** using the App Router pattern. Features magic link authentication, protected routes, and real-time friend management.
+
+## Tech Stack
+
+- **Next.js 14** (App Router)
+- **React 18** with Server Components
+- **Tailwind CSS** for styling
+- **Supabase Client** for authentication
+- **Context API** for state management
+
+## Project Structure
+
+```
+frontend/src/
+├── app/
+│   ├── page.js                 # Home page
+│   ├── layout.js               # Root layout with AuthProvider
+│   ├── globals.css             # Global styles
+│   ├── (auth)/
+│   │   └── signup/
+│   │       └── page.js         # Magic link signup page
+│   └── auth/
+│       └── callback/
+│           └── page.js         # OAuth callback handler
+├── components/
+│   └── ProtectedRoute.js       # Route protection HOC
+└── contexts/
+    └── AuthContext.js          # Authentication state management
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key Features
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Authentication
+- **Passwordless login** - Magic link via email
+- **Token management** - Access & refresh tokens in localStorage
+- **Protected routes** - Automatic redirect for unauthenticated users
+- **Auth context** - Global authentication state
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### UI/UX
+- **Responsive design** - Mobile-first with Tailwind CSS
+- **Loading states** - User feedback during async operations
+- **Error handling** - Clear error messages
+- **Auto-updates** - Pages refresh on auth state changes
 
-## Learn More
+## Architecture Highlights
 
-To learn more about Next.js, take a look at the following resources:
+- **App Router** - Modern Next.js routing with layouts
+- **Context Pattern** - Centralized auth state management
+- **Protected Routes** - Reusable HOC for route protection
+- **Server Components** - Optimized performance where possible
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Create a `.env.local` file:
 
-## Deploy on Vercel
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Authentication Flow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. User enters email on signup page
+2. Backend sends magic link to email
+3. User clicks magic link → redirected to `/auth/callback`
+4. Tokens extracted from URL hash and stored
+5. User redirected to home page as authenticated
+
+## Security Notes
+
+⚠️ **Production Checklist:**
+- Move tokens from localStorage to httpOnly cookies
+- Implement CSRF protection
+- Add rate limiting on auth endpoints
+- Use environment variables for all configs
+- Enable HTTPS only in production

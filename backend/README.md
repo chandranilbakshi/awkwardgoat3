@@ -1,153 +1,87 @@
-# Athena Backend - Passwordless Authentication with Supabase
+# Athena Backend
 
-This is a Go backend service that provides passwordless authentication using Supabase magic links (OTP).
+Go backend service providing passwordless authentication and friend management using Supabase.
 
-## Prerequisites
+## Overview
 
-- Go 1.21 or higher
-- A Supabase account and project
-- Node.js and npm/bun (for frontend)
+This backend uses **Fiber** (Go web framework) with **Supabase** for authentication and database operations. It implements magic link authentication, user profiles, and friend request management.
 
-## Setup
+## Tech Stack
 
-### 1. Install Go dependencies:
-```bash
-cd backend
-go mod download
-```
-
-### 2. Configure Supabase:
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Go to Project Settings > API
-3. Copy your project URL and anon/public key
-4. Update the `.env` file in the backend folder:
-
-```env
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_KEY=your-anon-key-here
-PORT=8080
-FRONTEND_URL=http://localhost:3000
-```
-
-### 3. Configure Supabase Authentication:
-
-1. In your Supabase dashboard, go to Authentication > Providers
-2. Enable Email provider
-3. Go to Authentication > URL Configuration
-4. Add `http://localhost:3000/auth/callback` to Redirect URLs
-5. (Optional) Customize email templates in Authentication > Email Templates
-
-### 4. Run the backend:
-```bash
-go run main.go
-```
-
-The server will start on `http://localhost:8080`
-
-### 5. Run the frontend:
-```bash
-cd frontend
-npm install  # or: bun install
-npm run dev  # or: bun dev
-```
-
-The frontend will start on `http://localhost:3000`
-
-## How It Works
-
-1. User enters their email on the signup page
-2. Backend calls Supabase Auth OTP API
-3. Supabase sends a magic link to the user's email
-4. User clicks the magic link
-5. User is redirected to `/auth/callback` with tokens in the URL hash
-6. Tokens are stored in localStorage (consider using httpOnly cookies in production)
-7. User is authenticated and redirected to the home page
-
-## API Endpoints
-
-### POST /api/auth/signup
-Send a magic link to the user's email for passwordless authentication.
-
-**Request:**
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "message": "Magic link sent to your email. Please check your inbox.",
-  "email": "user@example.com"
-}
-```
-
-**Error Response:**
-```json
-{
-  "error": "Failed to send magic link",
-  "details": "error details here"
-}
-```
-
-### GET /api/health
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "message": "Server is running"
-}
-```
+- **Go 1.25** with Fiber v2
+- **Supabase** (PostgreSQL + GoTrue Auth)
+- **Modular architecture** with clean separation of concerns
 
 ## Project Structure
 
 ```
-athena/
-├── backend/
-│   ├── main.go           # Main server file with routes and handlers
-│   ├── go.mod            # Go module dependencies
-│   ├── .env              # Environment variables (do not commit)
-│   └── README.md         # This file
-└── frontend/
-    └── src/
-        └── app/
-            ├── (auth)/
-            │   └── signup/
-            │       └── page.js      # Signup page with email input
-            └── auth/
-                └── callback/
-                    └── page.js      # Magic link callback handler
+backend/
+├── main.go                  # Application entry point
+├── config/
+│   └── config.go           # Environment configuration
+├── server/
+│   ├── fiberServer.go      # Server initialization
+│   └── routes.go           # Route definitions
+├── cors/
+│   └── cors.go            # CORS middleware configuration
+├── handlers/
+│   ├── types.go           # Request/response types
+│   ├── handlers_auth.go   # Authentication handlers
+│   ├── handlers_profile.go # Profile handlers
+│   └── handlers_friends.go # Friend management handlers
+└── utils/
+    ├── auth.go            # Auth client utilities
+    └── HandleSearchByUID.go # User search handler
 ```
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/signup` - Send magic link email
+- `POST /api/auth/refresh` - Refresh access token
+- `GET /api/auth/me` - Get current user info
+
+### Profile
+- `POST /api/user/create-profile` - Create user profile with unique UID
+- `GET /api/user/check-profile` - Check if profile exists
+
+### Friends
+- `GET /api/user/search-by-uid/:uid` - Search user by UID
+- `POST /api/friends/send-request` - Send friend request
+- `GET /api/friends/requests` - View friend requests (received/sent)
+- `PUT /api/friends/manage-request` - Accept/reject friend request
+- `GET /api/friends/list` - Get friends list
+
+### System
+- `GET /api/health` - Health check
+
+## Environment Variables
+
+Create a `.env` file in the backend directory:
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+PORT=8080
+FRONTEND_URL=http://localhost:3000
+```
+
+## Architecture Highlights
+
+- **Modular design** - Separated concerns (config, server, handlers, middleware)
+- **Clean code** - Each package has a single responsibility
+- **Reusable components** - Shared auth client, CORS config, error handling
+- **Scalable structure** - Easy to add new routes and handlers
 
 ## Security Notes
 
-⚠️ **Important for Production:**
-- Never commit your `.env` file to version control
-- Use httpOnly cookies instead of localStorage for tokens
-- Add rate limiting to prevent abuse
-- Validate and sanitize all inputs
+⚠️ **Production Checklist:**
+- Never commit `.env` to version control
 - Use HTTPS in production
-- Set proper CORS headers
-- Keep your Supabase service_role key secret (never expose to frontend)
-
-## Development
-
-To run in development mode with auto-reload, you can use tools like `air`:
-
-```bash
-go install github.com/cosmtrek/air@latest
-air
-```
-
-## Future Enhancements
-
-- Add WebSocket support for real-time chat
-- Implement WebRTC signaling for video/voice calls
+- Implement rate limiting
+- Add input validation and sanitization
+- Use httpOnly cookies for tokens
+- Keep service_role key secret
 - Add user profile management
 - Implement token refresh mechanism
 - Add session management
