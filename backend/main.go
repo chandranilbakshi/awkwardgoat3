@@ -1,12 +1,13 @@
 package main
 
 import (
-	"athena-backend/config"
-	"athena-backend/handlers"
-	"athena-backend/server"
-	"athena-backend/utils"
-	"github.com/supabase-community/gotrue-go"
+	"AthenaSphere-backend/config"
+	"AthenaSphere-backend/handlers"
+	"AthenaSphere-backend/server"
+	"AthenaSphere-backend/utils"
 	"log"
+
+	"github.com/supabase-community/gotrue-go"
 )
 
 var authClient gotrue.Client

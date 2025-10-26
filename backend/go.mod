@@ -1,4 +1,4 @@
-module athena-backend
+module AthenaSphere-backend
 
 go 1.25
 

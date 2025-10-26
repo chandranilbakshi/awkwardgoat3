@@ -1,8 +1,8 @@
 package server
 
 import (
-	"athena-backend/handlers"
-	"athena-backend/utils"
+	"AthenaSphere-backend/handlers"
+	"AthenaSphere-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 )

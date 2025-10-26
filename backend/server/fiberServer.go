@@ -2,8 +2,8 @@
 package server
 
 import (
-	"athena-backend/config"
-	customCors "athena-backend/cors"
+	"AthenaSphere-backend/config"
+	customCors "AthenaSphere-backend/cors"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
