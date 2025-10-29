@@ -21,6 +21,8 @@ export function useWebSocket() {
     return delay;
   }, []);
 
+  const accessToken = localStorage.getItem('access_token');
+
   const connect = useCallback(() => {
     // Guard: Don't connect if no user
     if (!userIdRef.current) {
@@ -48,7 +50,7 @@ export function useWebSocket() {
 
     // Mark as connecting
     isConnectingRef.current = true;
-    const wsUrl = `ws://localhost:8080/ws?user_id=${userIdRef.current}`;
+    const wsUrl = `ws://localhost:8080/ws?token=${encodeURIComponent(accessToken)}`;
     console.log(`🔌 Connecting to WebSocket (Attempt ${reconnectAttemptsRef.current + 1})...`);
 
     try {

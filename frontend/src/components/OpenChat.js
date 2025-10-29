@@ -204,7 +204,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
               formatDate(msg.timestamp);
 
           return (
-            <Fragment key={msg.id}>
+            <Fragment key={`${msg.id}-${index}`}>
               {showDate && (
                 <div className="flex justify-center mb-4">
                   <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full border">

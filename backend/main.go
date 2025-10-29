@@ -25,6 +25,7 @@ func main() {
 	// Set the auth client for handlers and utils
 	handlers.SetAuthClient(authClient)
 	utils.SetAuthClient(authClient)
+	server.SetAuthClient(authClient)
 
 	log.Println("GoTrue Auth client initialized successfully")
 

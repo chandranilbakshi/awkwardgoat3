@@ -3,10 +3,19 @@ package server
 import (
 	"athena-backend/handlers"
 	"athena-backend/utils"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
+	"github.com/supabase-community/gotrue-go"
 )
+
+var authClient gotrue.Client
+
+// SetAuthClient sets the auth client for use in utils
+func SetAuthClient(client gotrue.Client) {
+	authClient = client
+}
 
 func SetupRoutes(app *fiber.App) {
 	// Auth routes
@@ -30,15 +39,38 @@ func SetupRoutes(app *fiber.App) {
 	// Message routes
 	app.Get("/api/messages/history", handlers.HandleGetMessageHistory)
 
-	// WebSocket route - must handle upgrade
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		// IsWebSocketUpgrade returns true if the client requested upgrade to the WebSocket protocol
-		if websocket.IsWebSocketUpgrade(c) {
-			return c.Next()
+	app.Get("/ws", func(c *fiber.Ctx) error {
+		// Check if WebSocket upgrade
+		if !websocket.IsWebSocketUpgrade(c) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "WebSocket upgrade required",
+			})
 		}
-		return fiber.ErrUpgradeRequired
+
+		// Get token from query parameter
+		token := c.Query("token")
+		if token == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Authentication token required",
+			})
+		}
+
+		// Verify token and get user (same as your HTTP calls)
+		client := authClient.WithToken(token)
+		user, err := client.GetUser()
+		if err != nil {
+			log.Printf("WebSocket auth failed: %v", err)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Invalid or expired token",
+			})
+		}
+
+		// Store authenticated user_id in context
+		c.Locals("authenticated_user_id", user.ID.String())
+
+		// Upgrade to WebSocket
+		return websocket.New(handlers.HandleWebSocket)(c)
 	})
-	app.Get("/ws", websocket.New(handlers.HandleWebSocket))
 
 	// Health check
 	app.Get("/api/health", handleHealth)

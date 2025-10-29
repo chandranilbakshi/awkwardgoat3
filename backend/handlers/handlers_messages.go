@@ -156,16 +156,19 @@ func storeMessage(msg *Message) error {
 
 // WebSocket connection handler
 func HandleWebSocket(c *websocket.Conn) {
-	// Get user ID from query params
-	userID := c.Query("user_id")
-	if userID == "" {
-		log.Println("No user_id provided in WebSocket connection")
+	// Get AUTHENTICATED user ID from context (not from query!)
+	userIDInterface := c.Locals("authenticated_user_id")
+	if userIDInterface == nil {
+		log.Println("No authenticated user in WebSocket context")
 		c.Close()
 		return
 	}
 
+	userID := userIDInterface.(string)
+	log.Printf("Authenticated WebSocket connection for user: %s", userID)
+
 	client := &Client{
-		UserID: userID,
+		UserID: userID, // Now we KNOW this is legitimate
 		Conn:   c,
 		Send:   make(chan []byte, 256),
 	}
