@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import {
   Phone,
   Video,
@@ -204,9 +204,9 @@ export default function OpenChat({ selectedFriend, onClose }) {
               formatDate(msg.timestamp);
 
           return (
-            <>
+            <Fragment key={msg.id}>
               {showDate && (
-                <div key={`date-${msg.id}`} className="flex justify-center mb-4">
+                <div className="flex justify-center mb-4">
                   <span className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full border">
                     {formatDate(msg.timestamp)}
                   </span>
@@ -214,7 +214,6 @@ export default function OpenChat({ selectedFriend, onClose }) {
               )}
 
               <div
-                key={msg.id}
                 className={`flex ${
                   msg.isOwn ? "justify-end" : "justify-start"
                 }`}
@@ -236,7 +235,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
                   </p>
                 </div>
               </div>
-            </>
+            </Fragment>
           );
         }))
         }
