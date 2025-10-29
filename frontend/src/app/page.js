@@ -1,5 +1,6 @@
 'use client'
 import AddFriendModal from '@/components/AddFriendModal'
+import OpenChat from '@/components/OpenChat'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
@@ -21,30 +22,12 @@ export default function ChatPage() {
   const [friends, setFriends] = useState([])
   const [isLoadingFriends, setIsLoadingFriends] = useState(false)
   const [friendsError, setFriendsError] = useState('')
+  const [selectedFriend, setSelectedFriend] = useState(null)
   const buttonRef = useRef(null)
   const containerRef = useRef(null)
   const router = useRouter()
   const { user, loading } = useAuth()
   const { apiCall } = useApi()
-
-  // Redirect to signup if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/signup')
-    }
-  }, [user, loading, router])
-
-  // Don't render anything while loading or if not authenticated
-  if (loading || !user) {
-    return (
-      <div className="fixed inset-0 bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
 
   // Function to load friends list
   const loadFriends = useCallback(async () => {
@@ -69,6 +52,13 @@ export default function ChatPage() {
       setIsLoadingFriends(false)
     }
   }, [user, apiCall])
+
+  // Redirect to signup if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/signup')
+    }
+  }, [user, loading, router])
 
   // Check if user profile exists on mount
   useEffect(() => {
@@ -110,6 +100,69 @@ export default function ChatPage() {
       loadFriends()
     }
   }, [userUid, loadFriends])
+
+  // ESC key handler
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        closeModal()
+      }
+    }
+    
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'unset' // Cleanup on unmount
+    }
+  }, [isModalOpen])
+
+  // Resize handler
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing || !containerRef.current) return
+      
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const newWidth = e.clientX - containerRect.left
+      
+      // Set min and max widths (e.g., 250px to 600px)
+      const minWidth = 250
+      const maxWidth = 600
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setLeftPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+
+  // Don't render anything while loading or if not authenticated
+  if (loading || !user) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleNameSubmit = async (e) => {
     e.preventDefault()
@@ -178,68 +231,18 @@ export default function ChatPage() {
     }, 250) // Match animation duration
   }
 
-  // ESC key handler
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape' && isModalOpen) {
-        closeModal()
-      }
-    }
-    
-    document.addEventListener('keydown', handleEsc)
-    return () => {
-      document.removeEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'unset' // Cleanup on unmount
-    }
-  }, [isModalOpen])
-
   // Resize handler
   const handleMouseDown = (e) => {
     setIsResizing(true)
     e.preventDefault()
   }
 
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isResizing || !containerRef.current) return
-      
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const newWidth = e.clientX - containerRect.left
-      
-      // Set min and max widths (e.g., 250px to 600px)
-      const minWidth = 250
-      const maxWidth = 600
-      
-      if (newWidth >= minWidth && newWidth <= maxWidth) {
-        setLeftPanelWidth(newWidth)
-      }
-    }
-
-    const handleMouseUp = () => {
-      setIsResizing(false)
-    }
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-  }, [isResizing])
-
   return (
-      <div className="container min-h-screen bg-white p-1 flex mx-auto">
-        <div ref={containerRef} className="flex w-full relative">
+      <div className="container h-screen bg-white p-1 flex mx-auto">
+        <div ref={containerRef} className="flex w-full relative h-full">
           {/* Chat List Box */}
           <div 
-            className="bg-white border border-black rounded-2xl p-4 flex flex-col"
+            className="bg-white border border-black rounded-2xl p-4 flex flex-col h-full"
             style={{ width: `${leftPanelWidth}px`, minWidth: '300px' }}
           >
             <h2 className="text-xl font-bold text-black mb-4">Chats</h2>
@@ -264,14 +267,25 @@ export default function ChatPage() {
                   {friends.map((friend, index) => (
                     <div
                       key={friend.id || index}
-                      className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors border border-gray-200 hover:border-gray-300"
+                      onClick={() => setSelectedFriend(friend)}
+                      className={`p-3 rounded-xl cursor-pointer transition-colors border ${
+                        selectedFriend?.uid === friend.uid
+                          ? 'bg-black text-white border-black'
+                          : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-gray-300'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-black">{friend.name}</h3>
-                          <p className="text-xs text-gray-500">UID: {friend.uid}</p>
+                          <h3 className={`font-semibold ${
+                            selectedFriend?.uid === friend.uid ? 'text-white' : 'text-black'
+                          }`}>{friend.name}</h3>
+                          <p className={`text-xs ${
+                            selectedFriend?.uid === friend.uid ? 'text-gray-300' : 'text-gray-500'
+                          }`}>UID: {friend.uid}</p>
                         </div>
-                        <Ellipsis size={18} className="text-gray-600" />
+                        <Ellipsis size={18} className={`${
+                          selectedFriend?.uid === friend.uid ? 'text-gray-300' : 'text-gray-600'
+                        }`} />
                       </div>
                     </div>
                   ))}
@@ -298,9 +312,10 @@ export default function ChatPage() {
           />
 
           {/* Active Chat Box */}
-          <div className="flex-1 bg-white border border-black rounded-2xl p-4 flex items-center justify-center">
-            <p className="text-sm text-gray-600">Select a chat to start messaging</p>
-          </div>
+          <OpenChat 
+            selectedFriend={selectedFriend}
+            onClose={() => setSelectedFriend(null)}
+          />
         </div>
 
         {/* Add Friend Modal */}

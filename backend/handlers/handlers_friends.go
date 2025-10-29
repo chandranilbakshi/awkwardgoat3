@@ -3,12 +3,13 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/gofiber/fiber/v2"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func HandleSendFriendRequest(c *fiber.Ctx) error {
@@ -546,12 +547,12 @@ func HandleLoadFriends(c *fiber.Ctx) error {
 
 	// Query 1: Get friendships where current user is user_id_1 (friend is user_id_2)
 	friends1URL := supabaseURL + "/rest/v1/friendships?user_id_1=eq." + userID +
-		"&select=id,created_at,friend:user_profiles!friendships_user_id_2_fkey1(name,uid)" +
+		"&select=id,fid:user_id_2,created_at,friend:user_profiles!friendships_user_id_2_fkey1(name,uid)" +
 		"&order=created_at.desc"
 
 	// Query 2: Get friendships where current user is user_id_2 (friend is user_id_1)
 	friends2URL := supabaseURL + "/rest/v1/friendships?user_id_2=eq." + userID +
-		"&select=id,created_at,friend:user_profiles!friendships_user_id_1_fkey1(name,uid)" +
+		"&select=id,fid:user_id_1,created_at,friend:user_profiles!friendships_user_id_1_fkey1(name,uid)" +
 		"&order=created_at.desc"
 
 	// Execute both queries in parallel
@@ -634,6 +635,7 @@ func HandleLoadFriends(c *fiber.Ctx) error {
 		friends = append(friends, fiber.Map{
 			"id":   friendship["id"],
 			"name": friendInfo["name"],
+			"fid":  friendship["fid"],
 			"uid":  friendInfo["uid"],
 		})
 	}

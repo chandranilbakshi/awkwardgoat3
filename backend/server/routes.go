@@ -5,6 +5,7 @@ import (
 	"athena-backend/utils"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 )
 
 func SetupRoutes(app *fiber.App) {
@@ -25,6 +26,19 @@ func SetupRoutes(app *fiber.App) {
 	app.Get("/api/friends/requests", handlers.HandleViewFriendRequests)
 	app.Put("/api/friends/manage-request", handlers.HandleManageFriendRequest)
 	app.Get("/api/friends/list", handlers.HandleLoadFriends)
+
+	// Message routes
+	app.Get("/api/messages/history", handlers.HandleGetMessageHistory)
+
+	// WebSocket route - must handle upgrade
+	app.Use("/ws", func(c *fiber.Ctx) error {
+		// IsWebSocketUpgrade returns true if the client requested upgrade to the WebSocket protocol
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
+	app.Get("/ws", websocket.New(handlers.HandleWebSocket))
 
 	// Health check
 	app.Get("/api/health", handleHealth)
