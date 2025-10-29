@@ -2,6 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
+import { 
+  loadMessages, 
+  saveMessages
+} from "@/utils/chatStorage";
 
 export function useMessages(friendId) {
   const { user } = useAuth();
@@ -21,7 +25,22 @@ export function useMessages(friendId) {
 
     try {
       setLoading(true);
-      const url = `http://localhost:8080/api/messages/history?friend_id=${friendId}&limit=100`;
+      
+      // Check if we have local messages for this conversation
+      const localMessages = loadMessages(user.id, friendId);
+      
+      if (localMessages && localMessages.length > 0) {
+        // Load from local storage
+        console.log("useMessages - Loading from local storage:", localMessages.length, "messages");
+        setMessages(localMessages);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      
+      // No local messages, fetch from database (first time on this device)
+      console.log("useMessages - No local messages, fetching from database");
+      const url = `http://localhost:8080/api/messages/history?friend_id=${friendId}&limit=50`;
       console.log("useMessages - Fetching from:", url);
       
       const response = await apiCall(url);
@@ -44,6 +63,13 @@ export function useMessages(friendId) {
 
       console.log("useMessages - Transformed messages:", transformedMessages);
       setMessages(transformedMessages);
+      
+      // Save to local storage for future use
+      if (transformedMessages.length > 0) {
+        saveMessages(user.id, friendId, transformedMessages);
+        console.log("useMessages - Saved messages to local storage");
+      }
+      
       setError(null);
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -55,8 +81,17 @@ export function useMessages(friendId) {
 
   // Add a new message to the list
   const addMessage = useCallback((message) => {
-    setMessages((prev) => [...prev, message]);
-  }, []);
+    setMessages((prev) => {
+      const updatedMessages = [...prev, message];
+      
+      // Save to local storage whenever a new message is added
+      if (user && friendId) {
+        saveMessages(user.id, friendId, updatedMessages);
+      }
+      
+      return updatedMessages;
+    });
+  }, [user, friendId]);
 
   // Clear messages
   const clearMessages = useCallback(() => {

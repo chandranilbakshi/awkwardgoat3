@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearAllChats } from "@/utils/chatStorage";
 
 const AuthContext = createContext({});
 
@@ -88,6 +89,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    clearAllChats(); // Clear all chat data from local storage
     setUser(null);
     router.push("/signup");
   };

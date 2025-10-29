@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/useApi'
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, Plus } from 'lucide-react';
 
 export default function ChatPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -297,10 +297,10 @@ export default function ChatPage() {
             <button
               ref={buttonRef}
               onClick={openModal}
-              className={`absolute bottom-4 left w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
+              className={`absolute bottom-4 left w-13 h-13 bg-black text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
               aria-label="Add new chat"
             >
-              +
+              <Plus size={32} />
             </button>
           </div>
 

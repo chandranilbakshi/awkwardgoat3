@@ -207,7 +207,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
             <Fragment key={msg.id}>
               {showDate && (
                 <div className="flex justify-center mb-4">
-                  <span className="text-xs text-gray-500 bg-white px-3 py-1 rounded-full border">
+                  <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full border">
                     {formatDate(msg.timestamp)}
                   </span>
                 </div>
@@ -219,15 +219,15 @@ export default function OpenChat({ selectedFriend, onClose }) {
                 }`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-xl ${
+                  className={`max-w-xs lg:max-w-md p-2 rounded-xl ${
                     msg.isOwn
                       ? "bg-black text-white rounded-br-none"
                       : "bg-gray-200 text-black border border-gray-200 rounded-bl-none"
                   }`}
                 >
-                  <p className="text-sm">{msg.text}</p>
+                  <p className="break-all text-sm">{msg.text}</p>
                   <p
-                    className={`text-xs mt-1 ${
+                    className={`flex justify-end text-xs mt-1 ${
                       msg.isOwn ? "text-gray-300" : "text-gray-500"
                     }`}
                   >
@@ -243,7 +243,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
       </div>
 
       {/* Message Input Area */}
-      <div className="absolute bottom-2 left-2 right-2 z-10 p-1 pt-0 bg-white">
+      <div className="absolute bottom-2 left-2 right-2 z-10 p-1 bg-white">
         <div className="flex-1 bg-gray-100 rounded-full p-2 flex items-center">
           <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
             <Paperclip size={20} className="text-gray-600" />
