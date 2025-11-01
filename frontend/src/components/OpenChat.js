@@ -157,7 +157,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
   return (
     <div className="flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl flex flex-col p-2 min-h-0 relative">
       {/* Top Bar */}
-      <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-[#3e3e42] bg-[#252526]/90 backdrop-blur-md">
+      <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-[#3e3e42] bg-[#252526]/85 backdrop-blur-md">
         <div className="flex items-center">
           <div className="w-10 h-10 bg-[#3e3e42] rounded-full flex items-center justify-center mr-3">
             <span className="font-semibold text-[#d4d4d4]">
@@ -184,7 +184,28 @@ export default function OpenChat({ selectedFriend, onClose }) {
       </div>
 
       {/* Messages Area */}
-      <div className="absolute inset-2 overflow-y-auto px-4 pt-20 pb-24 space-y-4">
+      <div 
+        className="absolute inset-2 overflow-y-auto px-4 pt-20 pb-24"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#3e3e42 transparent'
+        }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            width: 6px;
+          }
+          div::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          div::-webkit-scrollbar-thumb {
+            background: #3e3e42;
+            border-radius: 3px;
+          }
+          div::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+          }
+        `}</style>
         {loading ? (
           <div className="flex justify-center items-center h-full">
             <div className="text-[#858585]">Loading messages...</div>
@@ -198,47 +219,50 @@ export default function OpenChat({ selectedFriend, onClose }) {
           </div>
         ) : (
           messages.map((msg, index) => {
-          const showDate =
-            index === 0 ||
-            formatDate(messages[index - 1].timestamp) !==
-              formatDate(msg.timestamp);
+            const showDate =
+              index === 0 ||
+              formatDate(messages[index - 1].timestamp) !==
+                formatDate(msg.timestamp);
 
-          return (
-            <Fragment key={`${msg.id}-${index}`}>
-              {showDate && (
-                <div className="flex justify-center mb-4">
-                  <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
-                    {formatDate(msg.timestamp)}
-                  </span>
-                </div>
-              )}
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            const isSameSender = prevMsg && prevMsg.sender === msg.sender && !showDate;
 
-              <div
-                className={`flex ${
-                  msg.isOwn ? "justify-end" : "justify-start"
-                }`}
-              >
+            return (
+              <Fragment key={`${msg.id}-${index}`}>
+                {showDate && (
+                  <div className="flex justify-center mb-4">
+                    <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
+                      {formatDate(msg.timestamp)}
+                    </span>
+                  </div>
+                )}
+
                 <div
-                  className={`max-w-xs lg:max-w-md p-2 rounded-xl ${
-                    msg.isOwn
-                      ? "bg-gray-600 text-white rounded-br-none"
-                      : "bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] rounded-bl-none"
-                  }`}
+                  className={`flex ${
+                    msg.isOwn ? "justify-end" : "justify-start"
+                  } ${isSameSender ? "mt-1" : "mt-4"}`}
                 >
-                  <p className="break-all text-sm">{msg.text}</p>
-                  <p
-                    className={`flex justify-end text-xs mt-1 ${
-                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
+                  <div
+                    className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
+                      msg.isOwn
+                        ? `bg-gray-600 text-white ${isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
+                        : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
                     }`}
                   >
-                    {formatTime(msg.timestamp)}
-                  </p>
+                    <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
+                    <p
+                      className={`flex items-end text-xs mt-1 ${
+                        msg.isOwn ? "text-gray-100" : "text-[#858585]"
+                      }`}
+                    >
+                      {formatTime(msg.timestamp)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Fragment>
-          );
-        }))
-        }
+              </Fragment>
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 

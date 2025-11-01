@@ -1,6 +1,12 @@
 package handlers
 
-import "github.com/supabase-community/gotrue-go"
+import (
+	"sync"
+	"time"
+
+	"github.com/gofiber/websocket/v2"
+	"github.com/supabase-community/gotrue-go"
+)
 
 // Shared authClient variable
 var authClient gotrue.Client
@@ -32,4 +38,37 @@ type SendRequestBody struct {
 type ManageRequestBody struct {
 	RequestID string `json:"request_id"`
 	Status    string `json:"status"` // "accepted" or "rejected"
+}
+
+// WebSocket client structure
+type Client struct {
+	UserID string
+	Conn   *websocket.Conn
+	Send   chan []byte
+}
+
+// Hub maintains active clients and broadcasts messages
+type Hub struct {
+	clients    map[string]*Client
+	broadcast  chan *Message
+	register   chan *Client
+	unregister chan *Client
+	mu         sync.RWMutex
+}
+
+// Message structure for WebSocket communication
+type Message struct {
+	ID        string    `json:"id,omitempty"`
+	UserID1   string    `json:"user_id_1"`
+	UserID2   string    `json:"user_id_2"`
+	SenderID  string    `json:"sender_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Message history request
+type MessageHistoryRequest struct {
+	FriendID string `json:"friend_id"`
+	Limit    int    `json:"limit"`
+	Offset   int    `json:"offset"`
 }
