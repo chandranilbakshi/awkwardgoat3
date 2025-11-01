@@ -155,10 +155,10 @@ export default function ChatPage() {
   // Don't render anything while loading or if not authenticated
   if (loading || !user) {
     return (
-      <div className="fixed inset-0 bg-white flex items-center justify-center">
+      <div className="fixed inset-0 bg-[#1e1e1e] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mb-4"></div>
+          <p className="text-[#858585]">Loading...</p>
         </div>
       </div>
     )
@@ -238,29 +238,29 @@ export default function ChatPage() {
   }
 
   return (
-      <div className="container h-screen bg-white p-1 flex mx-auto">
+      <div className="container h-screen bg-[#1e1e1e] p-1 flex mx-auto">
         <div ref={containerRef} className="flex w-full relative h-full">
           {/* Chat List Box */}
           <div 
-            className="bg-white border border-black rounded-2xl p-4 flex flex-col h-full"
+            className="bg-[#252526] border border-[#3e3e42] rounded-2xl p-4 flex flex-col h-full"
             style={{ width: `${leftPanelWidth}px`, minWidth: '300px' }}
           >
-            <h2 className="text-xl font-bold text-black mb-4">Chats</h2>
+            <h2 className="text-xl font-bold text-[#d4d4d4] mb-4">Chats</h2>
             
             {/* Friends List */}
             <div className="flex-1 overflow-y-auto">
               {isLoadingFriends ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
-                  <span className="ml-2 text-sm text-gray-600">Loading friends...</span>
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                  <span className="ml-2 text-sm text-[#858585]">Loading friends...</span>
                 </div>
               ) : friendsError ? (
                 <div className="flex items-center justify-center py-8">
-                  <p className="text-sm text-red-600">{friendsError}</p>
+                  <p className="text-sm text-red-400">{friendsError}</p>
                 </div>
               ) : friends.length === 0 ? (
                 <div className="flex items-center justify-center py-8">
-                  <p className="text-sm text-gray-600">No friends yet. Add some friends to start chatting!</p>
+                  <p className="text-sm text-[#858585]">No friends yet. Add some friends to start chatting!</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -270,21 +270,21 @@ export default function ChatPage() {
                       onClick={() => setSelectedFriend(friend)}
                       className={`p-3 rounded-xl cursor-pointer transition-colors border ${
                         selectedFriend?.uid === friend.uid
-                          ? 'bg-black text-white border-black'
-                          : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-gray-300'
+                          ? 'bg-gray-600 text-white border-gray-600'
+                          : 'bg-[#2a2d2e] hover:bg-[#3e3e42] border-[#3e3e42] hover:border-[#505050]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <h3 className={`font-semibold ${
-                            selectedFriend?.uid === friend.uid ? 'text-white' : 'text-black'
+                            selectedFriend?.uid === friend.uid ? 'text-white' : 'text-[#d4d4d4]'
                           }`}>{friend.name}</h3>
                           <p className={`text-xs ${
-                            selectedFriend?.uid === friend.uid ? 'text-gray-300' : 'text-gray-500'
+                            selectedFriend?.uid === friend.uid ? 'text-gray-100' : 'text-[#858585]'
                           }`}>UID: {friend.uid}</p>
                         </div>
                         <Ellipsis size={18} className={`${
-                          selectedFriend?.uid === friend.uid ? 'text-gray-300' : 'text-gray-600'
+                          selectedFriend?.uid === friend.uid ? 'text-white' : 'text-gray-100'
                         }`} />
                       </div>
                     </div>
@@ -297,7 +297,7 @@ export default function ChatPage() {
             <button
               ref={buttonRef}
               onClick={openModal}
-              className={`absolute bottom-4 left w-13 h-13 bg-black text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
+              className={`absolute bottom-4 left w-13 h-13 bg-gray-600 text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl hover:bg-gray-700 transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
               aria-label="Add new chat"
             >
               <Plus size={32} />
@@ -307,7 +307,7 @@ export default function ChatPage() {
           {/* Resizable Divider */}
           <div
             onMouseDown={handleMouseDown}
-            className={`w-1 hover:w-2 bg-transparent hover:bg-gray-300 cursor-col-resize transition-all ${isResizing ? 'w-2 bg-gray-400' : ''}`}
+            className={`w-1 hover:w-2 bg-transparent hover:bg-[#3e3e42] cursor-col-resize transition-all ${isResizing ? 'w-2 bg-[#505050]' : ''}`}
             style={{ minWidth: '4px' }}
           />
 
@@ -329,14 +329,14 @@ export default function ChatPage() {
 
         {/* Name Input Popup - Blocking Modal */}
         {showNamePopup && (
-          <div className="fixed inset-0 backdrop-blur-xs flex items-center justify-center z-[100]">
-            <div className="bg-white rounded-2xl w-[400px] p-8 shadow-[0_0_50px_rgba(80,80,80,0.5)]">
-              <h2 className="text-2xl font-bold mb-2 text-black">Welcome!</h2>
-              <p className="text-sm text-gray-600 mb-6">Please enter your full name to continue</p>
+          <div className="fixed inset-0 backdrop-blur-xs flex items-center justify-center z-[100] bg-black/50">
+            <div className="bg-[#252526] border border-[#3e3e42] rounded-2xl w-[400px] p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+              <h2 className="text-2xl font-bold mb-2 text-[#d4d4d4]">Welcome!</h2>
+              <p className="text-sm text-[#858585] mb-6">Please enter your full name to continue</p>
               
               <form onSubmit={handleNameSubmit}>
                 <div className="mb-4">
-                  <label htmlFor="fullName" className="block text-sm font-medium text-black mb-2">
+                  <label htmlFor="fullName" className="block text-sm font-medium text-[#d4d4d4] mb-2">
                     Full Name
                   </label>
                   <input
@@ -345,7 +345,7 @@ export default function ChatPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     disabled={isCreatingProfile}
-                    className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 border-2 border-[#3e3e42] bg-[#3c3c3c] text-[#d4d4d4] rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-[#2a2d2e] disabled:cursor-not-allowed placeholder-[#858585]"
                     placeholder="Enter your full name"
                     autoFocus
                     required
@@ -353,15 +353,15 @@ export default function ChatPage() {
                 </div>
 
                 {profileError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{profileError}</p>
+                  <div className="mb-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                    <p className="text-sm text-red-400">{profileError}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={isCreatingProfile}
-                  className="w-full py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-full py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:bg-[#3e3e42] disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isCreatingProfile ? (
                     <>
@@ -379,10 +379,10 @@ export default function ChatPage() {
 
         {/* Loading Screen while checking profile */}
         {isCheckingProfile && (
-          <div className="fixed inset-0 bg-white flex items-center justify-center z-[99]">
+          <div className="fixed inset-0 bg-[#1e1e1e] flex items-center justify-center z-[99]">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
-              <p className="text-gray-600">Loading...</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mb-4"></div>
+              <p className="text-[#858585]">Loading...</p>
             </div>
           </div>
         )}

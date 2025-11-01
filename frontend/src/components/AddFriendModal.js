@@ -239,11 +239,11 @@ export default function AddFriendModal({
   return (
     <>
       {/* Backdrop - transparent overlay for click outside */}
-      <div className="fixed inset-0 z-40 animate-fadeIn" onClick={onClose} />
+      <div className="fixed inset-0 z-40 animate-fadeIn bg-black/50" onClick={onClose} />
 
       {/* Modal - positioned absolutely with slide-up/down animation */}
       <div
-        className={`fixed bg-white border-2 border-black rounded-2xl w-[280px] p-5 pt-4 shadow-2xl z-50 ${
+        className={`fixed bg-[#252526] border-2 border-[#3e3e42] rounded-2xl w-[280px] p-5 pt-4 shadow-2xl z-50 ${
           isClosing ? "animate-slideDown" : "animate-slideUp"
         }`}
         style={{
@@ -254,14 +254,14 @@ export default function AddFriendModal({
       >
         <div className="flex justify-between mb-4">
           {/* Title */}
-          <h2 className="text-xl font-bold text-black">
+          <h2 className="text-xl font-bold text-[#d4d4d4]">
             {view === "main" ? "Add Friend" : view === "search" ? "Search Friend" : "Friend Requests"}
           </h2>
 
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="text-xl hover:scale-110 transition-transform cursor-pointer"
+            className="text-xl hover:scale-110 transition-transform cursor-pointer text-gray-100"
             aria-label="Close modal"
           >
             <X size={20} />
@@ -273,15 +273,15 @@ export default function AddFriendModal({
           <>
             {/* Your ID Section */}
             {userUid && (
-              <div className="flex flex-row items-center justify-between mb-4 p-3 bg-gray-50 border border-gray-300 rounded-lg">
-                <div className="text-xs text-gray-600">Your ID</div>
+              <div className="flex flex-row items-center justify-between mb-4 p-3 bg-[#4A5565] border border-[#3e3e42] rounded-lg">
+                <div className="text-xs text-[#aaaaaa]">Your ID</div>
                 <div className="flex items-center">
-                  <span className="text-lg font-mono font-bold text-black">
+                  <span className="text-lg font-mono font-bold text-[#d4d4d4]">
                     {userUid.toString().padStart(8, "0")}
                   </span>
                   <button
                     onClick={handleCopyUid}
-                    className="ml-2 cursor-pointer"
+                    className="ml-2 cursor-pointer text-gray-100"
                   >
                     {showCopied ? <Check size={18} /> : <Copy size={18} />}
                   </button>
@@ -292,12 +292,12 @@ export default function AddFriendModal({
             {/* Option 1: Send Friend Request */}
             <button
               onClick={handleSendRequestClick}
-              className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left"
+              className="w-full h-[70px] border-2 border-[#3e3e42] rounded-[10px] p-3 hover:bg-[#3e3e42] transition-colors text-left"
             >
-              <div className="font-bold text-[15px] text-black">
+              <div className="font-bold text-[15px] text-[#d4d4d4]">
                 Send Friend Request
               </div>
-              <div className="text-[13px] text-gray-600">
+              <div className="text-[13px] text-[#858585]">
                 Search by 8-digit ID
               </div>
             </button>
@@ -305,12 +305,12 @@ export default function AddFriendModal({
             {/* Option 2: View Friend Requests */}
             <button
               onClick={handleViewRequests}
-              className="w-full h-[70px] border-2 border-black rounded-[10px] p-3 hover:bg-gray-100 transition-colors text-left mt-3"
+              className="w-full h-[70px] border-2 border-[#3e3e42] rounded-[10px] p-3 hover:bg-[#3e3e42] transition-colors text-left mt-3"
             >
-              <div className="font-bold text-[15px] text-black">
+              <div className="font-bold text-[15px] text-[#d4d4d4]">
                 Friend Requests
               </div>
-              <div className="text-[13px] text-gray-600">
+              <div className="text-[13px] text-[#858585]">
                 View pending requests
               </div>
             </button>
@@ -323,7 +323,7 @@ export default function AddFriendModal({
             {/* Back Button */}
             <button
               onClick={handleBack}
-              className="mb-3 text-sm text-gray-600 hover:text-black flex items-center"
+              className="mb-3 text-sm text-gray-100 hover:text-white flex items-center"
             >
               <ChevronLeft size={20} />
               Back
@@ -331,7 +331,7 @@ export default function AddFriendModal({
 
             {/* Search Input */}
             <div className="mb-4">
-              <label className="block text-xs text-gray-600 mb-2">
+              <label className="block text-xs text-[#858585] mb-2">
                 Enter 8-digit ID
               </label>
               <div className="relative">
@@ -342,12 +342,12 @@ export default function AddFriendModal({
                     setSearchUID(e.target.value.replace(/\D/g, "").slice(0, 8))
                   }
                   placeholder="_ _ _ _ _ _ _ _"
-                  className="w-full px-3 py-2 pr-10 border-2 border-black rounded-lg font-mono text-center focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  className="w-full px-3 py-2 pr-10 border-2 border-[#3e3e42] bg-[#3c3c3c] text-[#d4d4d4] rounded-lg font-mono text-center focus:outline-none focus:ring-2 focus:ring-gray-500 placeholder-[#858585]"
                   maxLength={8}
                 />
                 <button
                   onClick={handlePaste}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 pr-2 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 pr-2 cursor-pointer text-gray-100"
                 >
                   <Clipboard size={18} />
                 </button>
@@ -356,8 +356,8 @@ export default function AddFriendModal({
 
             {/* Success Message */}
             {successMessage && (
-              <div className="mb-3 p-3 bg-green-50 border border-green-300 rounded-lg">
-                <p className="text-sm text-green-700 font-semibold">
+              <div className="mb-3 p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
+                <p className="text-sm text-green-400 font-semibold">
                   {successMessage}
                 </p>
               </div>
@@ -365,15 +365,15 @@ export default function AddFriendModal({
 
             {/* Error Message */}
             {searchError && !successMessage && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-300 rounded-lg">
-                <p className="text-sm text-red-600">{searchError}</p>
+              <div className="mb-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                <p className="text-sm text-red-400">{searchError}</p>
               </div>
             )}
 
             {/* Loading State */}
             {isSearching && (
               <div className="text-center py-4">
-                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
               </div>
             )}
 
@@ -383,16 +383,16 @@ export default function AddFriendModal({
                 {searchResults.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 border border-gray-300 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-[#2a2d2e] border border-[#3e3e42] rounded-lg"
                   >
                     <div className="flex-1">
-                      <div className="text-sm font-semibold text-gray-600">
+                      <div className="text-sm font-semibold text-[#d4d4d4]">
                         {user.name}
                       </div>
                     </div>
                     <button
                       onClick={() => handleSendFriendRequest(user.id)}
-                      className="mr-1 cursor-pointer"
+                      className="mr-1 cursor-pointer text-gray-100"
                     >
                       <SendHorizonal size={20} />
                     </button>
@@ -407,7 +407,7 @@ export default function AddFriendModal({
               !searchError &&
               searchUID.length < 8 && (
                 <div className="text-center py-4">
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[#858585]">
                     Enter an 8-digit ID to search
                   </p>
                 </div>
@@ -421,7 +421,7 @@ export default function AddFriendModal({
             {/* Back Button */}
             <button
               onClick={handleBack}
-              className="mb-3 text-sm text-gray-600 hover:text-black flex items-center"
+              className="mb-3 text-sm text-gray-100 hover:text-white flex items-center"
             >
               <ChevronLeft size={20} />
               Back
@@ -435,8 +435,8 @@ export default function AddFriendModal({
                   onClick={() => setActiveTab("received")}
                   className={`text-sm font-semibold pb-1 transition-colors ${
                     activeTab === "received"
-                      ? "text-black border-b-2 border-black"
-                      : "text-gray-400 hover:text-gray-600"
+                      ? "text-[#d4d4d4] border-b-2 border-gray-400"
+                      : "text-[#858585] hover:text-[#d4d4d4]"
                   }`}
                 >
                   Received
@@ -445,8 +445,8 @@ export default function AddFriendModal({
                   onClick={() => setActiveTab("sent")}
                   className={`text-sm font-semibold pb-1 transition-colors ${
                     activeTab === "sent"
-                      ? "text-black border-b-2 border-black"
-                      : "text-gray-400 hover:text-gray-600"
+                      ? "text-[#d4d4d4] border-b-2 border-gray-400"
+                      : "text-[#858585] hover:text-[#d4d4d4]"
                   }`}
                 >
                   Sent
@@ -457,7 +457,7 @@ export default function AddFriendModal({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs rounded"
+                className="text-xs rounded bg-[#3c3c3c] text-[#d4d4d4] border border-[#3e3e42] px-2 py-1"
               >
                 <option value="pending">Pending</option>
                 <option value="accepted">Accepted</option>
@@ -469,22 +469,22 @@ export default function AddFriendModal({
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {isLoadingRequests && requestsOffset === 0 ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
                 </div>
               ) : requests.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500">No requests found</p>
+                  <p className="text-sm text-[#858585]">No requests found</p>
                 </div>
               ) : (
                 <>
                   {requests.map((request) => (
                     <div
                       key={request.id}
-                      className="p-3 bg-gray-50 border border-gray-300 rounded-lg"
+                      className="p-3 bg-[#2a2d2e] border border-[#3e3e42] rounded-lg"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
-                          <div className="text-sm font-semibold text-black">
+                          <div className="text-sm font-semibold text-[#d4d4d4]">
                             {request.user_name}
                           </div>
                         </div>
@@ -493,10 +493,10 @@ export default function AddFriendModal({
                         <span
                           className={`text-xs px-2 py-1 rounded-full font-semibold ${
                             request.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700"
+                              ? "bg-yellow-900/30 text-yellow-400 border border-yellow-700/50"
                               : request.status === "accepted"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
+                              ? "bg-green-900/30 text-green-400 border border-green-700/50"
+                              : "bg-red-900/30 text-red-400 border border-red-700/50"
                           }`}
                         >
                           {request.status.charAt(0).toUpperCase() +
@@ -512,7 +512,7 @@ export default function AddFriendModal({
                               onClick={() => {
                                 handleManageFriendRequest(request.id, "accepted");
                               }}
-                              className="flex-1 px-3 py-1.5 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors flex items-center justify-center gap-1"
+                              className="flex-1 px-3 py-1.5 bg-gray-600 text-white text-xs font-semibold rounded hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
                             >
                               <Check size={15} /> Accept
                             </button>
@@ -520,7 +520,7 @@ export default function AddFriendModal({
                               onClick={() => {
                                 handleManageFriendRequest(request.id, "rejected");
                               }}
-                              className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-semibold rounded hover:bg-gray-100 transition-colors flex items-center justify-center gap-1"
+                              className="flex-1 px-3 py-1.5 border border-[#3e3e42] text-gray-100 text-xs font-semibold rounded hover:bg-[#3e3e42] transition-colors flex items-center justify-center gap-1"
                             >
                               <X size={15} /> Reject
                             </button>
@@ -534,7 +534,7 @@ export default function AddFriendModal({
                     <button
                       onClick={handleLoadMore}
                       disabled={isLoadingRequests}
-                      className="w-full py-2 text-sm text-gray-600 hover:text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full py-2 text-sm text-gray-100 hover:text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoadingRequests ? "Loading..." : "Load More"}
                     </button>

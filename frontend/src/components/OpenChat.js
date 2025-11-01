@@ -138,15 +138,15 @@ export default function OpenChat({ selectedFriend, onClose }) {
 
   if (!selectedFriend) {
     return (
-      <div className="flex-1 bg-white border border-black rounded-2xl p-4 flex items-center justify-center">
+      <div className="flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl p-4 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+          <div className="w-24 h-24 bg-[#2a2d2e] rounded-full flex items-center justify-center mb-4 mx-auto">
             <span className="text-4xl">💬</span>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          <h3 className="text-lg font-semibold text-[#d4d4d4] mb-2">
             Select a chat to start messaging
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[#858585]">
             Choose a conversation from the sidebar to begin chatting
           </p>
         </div>
@@ -155,30 +155,30 @@ export default function OpenChat({ selectedFriend, onClose }) {
   }
 
   return (
-    <div className="flex-1 bg-white border border-black rounded-2xl flex flex-col p-2 min-h-0 relative">
+    <div className="flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl flex flex-col p-2 min-h-0 relative">
       {/* Top Bar */}
-      <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-gray-200 bg-white/80 backdrop-blur-md">
+      <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-[#3e3e42] bg-[#252526]/90 backdrop-blur-md">
         <div className="flex items-center">
-          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center mr-3">
-            <span className="font-semibold">
+          <div className="w-10 h-10 bg-[#3e3e42] rounded-full flex items-center justify-center mr-3">
+            <span className="font-semibold text-[#d4d4d4]">
               {selectedFriend.name.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
-            <h3 className="font-semibold text-black">{selectedFriend.name}</h3>
-            <p className="text-xs text-gray-500">UID: {selectedFriend.uid}</p>
+            <h3 className="font-semibold text-[#d4d4d4]">{selectedFriend.name}</h3>
+            <p className="text-xs text-[#858585]">UID: {selectedFriend.uid}</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <Phone size={20} className="text-gray-600" />
+          <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
+            <Phone size={20} className="text-gray-100" />
           </button>
-          <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <Video size={20} className="text-gray-600" />
+          <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
+            <Video size={20} className="text-gray-100" />
           </button>
-          <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <MoreVertical size={20} className="text-gray-600" />
+          <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
+            <MoreVertical size={20} className="text-gray-100" />
           </button>
         </div>
       </div>
@@ -187,11 +187,11 @@ export default function OpenChat({ selectedFriend, onClose }) {
       <div className="absolute inset-2 overflow-y-auto px-4 pt-20 pb-24 space-y-4">
         {loading ? (
           <div className="flex justify-center items-center h-full">
-            <div className="text-gray-500">Loading messages...</div>
+            <div className="text-[#858585]">Loading messages...</div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex justify-center items-center h-full">
-            <div className="text-gray-500 text-center">
+            <div className="text-[#858585] text-center">
               <p>No messages yet</p>
               <p className="text-sm">Send a message to start the conversation</p>
             </div>
@@ -207,7 +207,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
             <Fragment key={`${msg.id}-${index}`}>
               {showDate && (
                 <div className="flex justify-center mb-4">
-                  <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full border">
+                  <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
                     {formatDate(msg.timestamp)}
                   </span>
                 </div>
@@ -221,14 +221,14 @@ export default function OpenChat({ selectedFriend, onClose }) {
                 <div
                   className={`max-w-xs lg:max-w-md p-2 rounded-xl ${
                     msg.isOwn
-                      ? "bg-black text-white rounded-br-none"
-                      : "bg-gray-200 text-black border border-gray-200 rounded-bl-none"
+                      ? "bg-gray-600 text-white rounded-br-none"
+                      : "bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] rounded-bl-none"
                   }`}
                 >
                   <p className="break-all text-sm">{msg.text}</p>
                   <p
                     className={`flex justify-end text-xs mt-1 ${
-                      msg.isOwn ? "text-gray-300" : "text-gray-500"
+                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
                     }`}
                   >
                     {formatTime(msg.timestamp)}
@@ -243,13 +243,13 @@ export default function OpenChat({ selectedFriend, onClose }) {
       </div>
 
       {/* Message Input Area */}
-      <div className="absolute bottom-2 left-2 right-2 z-10 p-1 bg-white">
-        <div className="flex-1 bg-gray-100 rounded-full p-2 flex items-center">
-          <button className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <Paperclip size={20} className="text-gray-600" />
+      <div className="absolute bottom-2 left-2 right-2 z-10 p-1 bg-[#252526]">
+        <div className="flex-1 bg-[#3c3c3c] rounded-full p-2 flex items-center">
+          <button className="p-2 hover:bg-[#262629] rounded-full transition-colors">
+            <Paperclip size={20} className="text-gray-100" />
           </button>
-          <button className="p-1 hover:bg-gray-200 rounded-full transition-colors mr-2">
-            <Smile size={20} className="text-gray-600" />
+          <button className="p-1 hover:bg-[#262629] rounded-full transition-colors mr-2">
+            <Smile size={20} className="text-gray-100" />
           </button>
 
           <textarea
@@ -258,14 +258,14 @@ export default function OpenChat({ selectedFriend, onClose }) {
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
-            className="flex-1 bg-transparent resize-none outline-none text-sm max-h-[120px] py-1"
+            className="flex-1 bg-transparent resize-none outline-none text-sm max-h-[120px] py-1 text-[#d4d4d4] placeholder-[#858585]"
             rows="1"
           />
           
           {message.trim() ? (
             <button
               onClick={handleSendMessage}
-              className="p-2 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
+              className="p-2 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition-colors"
             >
               <ArrowUp size={20} />
             </button>
@@ -274,7 +274,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
               className={`p-2 rounded-full transition-colors ${
                 isRecording
                   ? "bg-red-500 text-white animate-pulse"
-                  : "hover:bg-gray-100 text-gray-600"
+                  : "hover:bg-[#262629] text-gray-100"
               }`}
               onMouseDown={() => setIsRecording(true)}
               onMouseUp={() => setIsRecording(false)}
@@ -287,7 +287,7 @@ export default function OpenChat({ selectedFriend, onClose }) {
 
         {isRecording && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-red-500 animate-pulse">
+            <span className="text-xs text-red-400 animate-pulse">
               Recording... Release to send
             </span>
           </div>

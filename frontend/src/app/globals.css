@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #1e1e1e;
+  --foreground: #d4d4d4;
+  --card-bg: #252526;
+  --border-color: #3e3e42;
+  --accent: #007acc;
+  --accent-hover: #005a9e;
+  --text-muted: #858585;
+  --input-bg: #3c3c3c;
+  --hover-bg: #2a2d2e;
 }
 
 @theme inline {
@@ -13,7 +20,7 @@
 }
 
 body {
-  background: #ffffff;
+  background: #1e1e1e;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }

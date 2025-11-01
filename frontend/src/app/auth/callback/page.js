@@ -66,13 +66,13 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full p-8 bg-white rounded-xl shadow-2xl text-center">
+    <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
+      <div className="max-w-md w-full p-8 bg-[#252526] border border-[#3e3e42] rounded-xl shadow-2xl text-center">
         <div className="mb-4">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400"></div>
         </div>
-        <h2 className="text-xl font-semibold mb-2">Authenticating</h2>
-        <p className="text-gray-600">{status}</p>
+        <h2 className="text-xl font-semibold mb-2 text-[#d4d4d4]">Authenticating</h2>
+        <p className="text-[#858585]">{status}</p>
       </div>
     </div>
   );
