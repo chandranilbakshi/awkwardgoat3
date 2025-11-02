@@ -58,7 +58,7 @@ export default function AddFriendModal({
     const timer = setTimeout(async () => {
       try {
         const response = await apiCall(
-          `http://localhost:8080/api/user/search-by-uid/${searchUID}`
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/search-by-uid/${searchUID}`
         );
 
         const data = await response.json();
@@ -122,7 +122,7 @@ export default function AddFriendModal({
   const handleSendFriendRequest = async (receiverID) => {
     try {
       const response = await apiCall(
-        "http://localhost:8080/api/friends/send-request",
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/friends/send-request`,
         {
           method: "POST",
           body: JSON.stringify({ receiver_id: receiverID }),
@@ -163,7 +163,7 @@ export default function AddFriendModal({
       const status = statusFilter; // 'pending', 'accepted', 'rejected'
       
       const response = await apiCall(
-        `http://localhost:8080/api/friends/requests?type=${type}&status=${status}&offset=${offset}&limit=5`
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/friends/requests?type=${type}&status=${status}&offset=${offset}&limit=5`
       );
 
       const data = await response.json();
@@ -207,7 +207,7 @@ export default function AddFriendModal({
   const handleManageFriendRequest = async (requestId, status) => {
     try {
       const response = await apiCall(
-        "http://localhost:8080/api/friends/manage-request",
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/friends/manage-request`,
         {
           method: "PUT",
           body: JSON.stringify({

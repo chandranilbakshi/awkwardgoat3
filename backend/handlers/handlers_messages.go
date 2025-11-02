@@ -225,8 +225,11 @@ func HandleGetMessageHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	limit := c.QueryInt("limit", 50)
+	limit := c.QueryInt("limit", 100)
 	offset := c.QueryInt("offset", 0)
+
+	// Get optional 'since' parameter for incremental sync
+	sinceParam := c.Query("since")
 
 	// Ensure user_id_1 < user_id_2
 	userIDs := []string{user.ID.String(), friendID}
@@ -234,9 +237,17 @@ func HandleGetMessageHistory(c *fiber.Ctx) error {
 	userID1 := userIDs[0]
 	userID2 := userIDs[1]
 
-	// Query messages from Supabase using REST API
-	url := fmt.Sprintf("%s/rest/v1/messages?user_id_1=eq.%s&user_id_2=eq.%s&order=created_at.asc&limit=%d&offset=%d",
-		supabaseURL, userID1, userID2, limit, offset)
+	// Build query URL with optional 'since' filter
+	var url string
+	if sinceParam != "" {
+		// Incremental sync: fetch only messages created after 'since' timestamp
+		url = fmt.Sprintf("%s/rest/v1/messages?user_id_1=eq.%s&user_id_2=eq.%s&created_at=gt.%s&order=created_at.asc&limit=%d",
+			supabaseURL, userID1, userID2, sinceParam, limit)
+	} else {
+		// Full sync: fetch all messages with limit and offset
+		url = fmt.Sprintf("%s/rest/v1/messages?user_id_1=eq.%s&user_id_2=eq.%s&order=created_at.asc&limit=%d&offset=%d",
+			supabaseURL, userID1, userID2, limit, offset)
+	}
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

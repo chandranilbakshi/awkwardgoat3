@@ -1,10 +1,12 @@
 /**
  * Utility for managing chat messages in local storage
  * Each conversation is stored separately by conversation key
+ * Includes sync metadata for efficient incremental updates
  */
 
 const STORAGE_PREFIX = "chat_messages_";
 const CHAT_METADATA_KEY = "chat_metadata";
+const SYNC_METADATA_SUFFIX = "_sync";
 
 /**
  * Generate a consistent conversation key from two user IDs
@@ -16,12 +18,25 @@ export function getConversationKey(userId1, userId2) {
 }
 
 /**
- * Save messages for a specific conversation
+ * Generate sync metadata key for a conversation
  */
-export function saveMessages(userId1, userId2, messages) {
+function getSyncMetadataKey(conversationKey) {
+  return `${conversationKey}${SYNC_METADATA_SUFFIX}`;
+}
+
+/**
+ * Save messages for a specific conversation
+ * Also updates the last sync timestamp
+ */
+export function saveMessages(userId1, userId2, messages, updateSyncTime = true) {
   try {
     const key = getConversationKey(userId1, userId2);
     localStorage.setItem(key, JSON.stringify(messages));
+    
+    // Update sync metadata
+    if (updateSyncTime) {
+      updateLastSyncTime(userId1, userId2);
+    }
     
     // Update metadata to track which conversations have local data
     updateChatMetadata(key);
@@ -67,12 +82,87 @@ export function hasLocalMessages(userId1, userId2) {
 }
 
 /**
+ * Get the last sync timestamp for a conversation
+ * Returns null if never synced
+ */
+export function getLastSyncTime(userId1, userId2) {
+  try {
+    const key = getConversationKey(userId1, userId2);
+    const syncKey = getSyncMetadataKey(key);
+    const syncData = localStorage.getItem(syncKey);
+    
+    if (!syncData) {
+      return null;
+    }
+    
+    const { lastSynced } = JSON.parse(syncData);
+    return lastSynced ? new Date(lastSynced) : null;
+  } catch (error) {
+    console.error("Error getting last sync time:", error);
+    return null;
+  }
+}
+
+/**
+ * Update the last sync timestamp for a conversation
+ */
+export function updateLastSyncTime(userId1, userId2, timestamp = new Date()) {
+  try {
+    const key = getConversationKey(userId1, userId2);
+    const syncKey = getSyncMetadataKey(key);
+    
+    const syncData = {
+      lastSynced: timestamp.toISOString(),
+      conversationKey: key,
+    };
+    
+    localStorage.setItem(syncKey, JSON.stringify(syncData));
+    return true;
+  } catch (error) {
+    console.error("Error updating last sync time:", error);
+    return false;
+  }
+}
+
+/**
+ * Merge new messages with existing messages
+ * Removes duplicates based on message ID and sorts by timestamp
+ */
+export function mergeMessages(existingMessages, newMessages) {
+  // Create a map to track unique messages by ID
+  const messageMap = new Map();
+  
+  // Add existing messages
+  existingMessages.forEach(msg => {
+    messageMap.set(msg.id, msg);
+  });
+  
+  // Add/update with new messages
+  newMessages.forEach(msg => {
+    messageMap.set(msg.id, msg);
+  });
+  
+  // Convert back to array and sort by timestamp
+  const merged = Array.from(messageMap.values());
+  merged.sort((a, b) => {
+    const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+    const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+    return timeA - timeB;
+  });
+  
+  return merged;
+}
+
+/**
  * Clear messages for a specific conversation
  */
 export function clearConversation(userId1, userId2) {
   try {
     const key = getConversationKey(userId1, userId2);
+    const syncKey = getSyncMetadataKey(key);
+    
     localStorage.removeItem(key);
+    localStorage.removeItem(syncKey);
     removeChatMetadata(key);
     return true;
   } catch (error) {
@@ -88,9 +178,10 @@ export function clearAllChats() {
   try {
     const metadata = getChatMetadata();
     
-    // Remove all conversation data
+    // Remove all conversation data and sync metadata
     metadata.conversations.forEach(key => {
       localStorage.removeItem(key);
+      localStorage.removeItem(getSyncMetadataKey(key));
     });
     
     // Clear metadata

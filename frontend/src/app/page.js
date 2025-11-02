@@ -37,7 +37,7 @@ export default function ChatPage() {
     setFriendsError('')
 
     try {
-      const response = await apiCall('http://localhost:8080/api/friends/list')
+      const response = await apiCall(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/friends/list`)
       const data = await response.json()
 
       if (response.ok) {
@@ -70,7 +70,7 @@ export default function ChatPage() {
 
       try {
         // Check if user profile exists via backend using API interceptor
-        const response = await apiCall('http://localhost:8080/api/user/check-profile')
+        const response = await apiCall(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/check-profile`)
 
         if (response.ok) {
           const data = await response.json()
@@ -177,7 +177,7 @@ export default function ChatPage() {
 
     try {
       // Call backend to create profile using API interceptor
-      const response = await apiCall('http://localhost:8080/api/user/create-profile', {
+      const response = await apiCall(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/create-profile`, {
         method: 'POST',
         body: JSON.stringify({ name: fullName.trim() }),
       })

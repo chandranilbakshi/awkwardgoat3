@@ -50,7 +50,7 @@ export function useWebSocket() {
 
     // Mark as connecting
     isConnectingRef.current = true;
-    const wsUrl = `ws://localhost:8080/ws?token=${encodeURIComponent(accessToken)}`;
+    const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'}/ws?token=${encodeURIComponent(accessToken)}`;
     console.log(`🔌 Connecting to WebSocket (Attempt ${reconnectAttemptsRef.current + 1})...`);
 
     try {

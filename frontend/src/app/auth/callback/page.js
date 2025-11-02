@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
 
         // Fetch user data
         try {
-          const userResponse = await fetch("http://localhost:8080/api/auth/me", {
+          const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/me`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
