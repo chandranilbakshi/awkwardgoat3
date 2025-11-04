@@ -22,9 +22,15 @@ COPY --from=deps /app/bun.lockb* ./
 # Copy source code
 COPY . .
 
-# Set environment variable for production build
+# Accept build arguments
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+
+# Set environment variables for the build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 
 # Build the Next.js application with Bun
 RUN bun run build

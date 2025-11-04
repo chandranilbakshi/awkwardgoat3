@@ -15,9 +15,10 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	// Load environment variables
+	// Try to load .env file (optional - for local development)
+	// In production (ECS), environment variables are provided by the task definition
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+		log.Println("No .env file found - using environment variables from system")
 	}
 
 	supabaseURL := os.Getenv("SUPABASE_URL")
@@ -36,6 +37,8 @@ func Load() (*Config, error) {
 	if frontendURL == "" {
 		frontendURL = "http://localhost:3000"
 	}
+
+	log.Println("Configuration loaded successfully")
 
 	return &Config{
 		SupabaseURL: supabaseURL,

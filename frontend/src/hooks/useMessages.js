@@ -110,9 +110,11 @@ export function useMessages(friendId) {
     setMessages((prev) => {
       const updatedMessages = mergeMessages(prev, [message]);
       
-      // Save to local storage (don't update sync time for optimistic updates)
+      // Save to local storage AND update sync time to prevent re-fetching this message
       if (user && friendId) {
-        saveMessages(user.id, friendId, updatedMessages, false);
+        saveMessages(user.id, friendId, updatedMessages, true);
+        // Update sync time to the new message's timestamp to avoid duplicates
+        updateLastSyncTime(user.id, friendId, message.timestamp);
       }
       
       return updatedMessages;

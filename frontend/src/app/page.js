@@ -23,11 +23,24 @@ export default function ChatPage() {
   const [isLoadingFriends, setIsLoadingFriends] = useState(false)
   const [friendsError, setFriendsError] = useState('')
   const [selectedFriend, setSelectedFriend] = useState(null)
+  const [isMobile, setIsMobile] = useState(false)
   const buttonRef = useRef(null)
   const containerRef = useRef(null)
   const router = useRouter()
   const { user, loading } = useAuth()
   const { apiCall } = useApi()
+
+  // Detect mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Function to load friends list
   const loadFriends = useCallback(async () => {
@@ -213,7 +226,7 @@ export default function ChatPage() {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       setModalPosition({
-        left: rect.left + rect.width / 2,
+        left: rect.left + rect.width / 2 ,
         bottom: window.innerHeight - rect.top + 16
       })
     }
@@ -238,12 +251,17 @@ export default function ChatPage() {
   }
 
   return (
-      <div className="container h-screen bg-[#1e1e1e] p-1 flex mx-auto">
-        <div ref={containerRef} className="flex w-full relative h-full">
+      <div className="container h-screen bg-[#1e1e1e] md:p-1 flex mx-auto">
+        <div ref={containerRef} className="md:flex w-full relative h-full overflow-hidden">
           {/* Chat List Box */}
           <div 
-            className="bg-[#252526] border border-[#3e3e42] rounded-2xl p-4 flex flex-col h-full"
-            style={{ width: `${leftPanelWidth}px`, minWidth: '300px' }}
+            className={`bg-[#252526] border border-[#3e3e42] md:rounded-2xl p-4 flex flex-col h-full transition-transform duration-300 ${
+              isMobile && selectedFriend ? 'hidden' : 'flex'
+            }`}
+            style={{ 
+              width: !isMobile ? `${leftPanelWidth}px` : '100%',
+              minWidth: !isMobile ? '300px' : 'auto'
+            }}
           >
             <h2 className="text-xl font-bold text-[#d4d4d4] mb-4">Chats</h2>
             
@@ -297,17 +315,17 @@ export default function ChatPage() {
             <button
               ref={buttonRef}
               onClick={openModal}
-              className={`absolute bottom-4 left w-13 h-13 bg-gray-600 text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl hover:bg-gray-700 transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
+              className={`absolute bottom-4 left-4 w-13 h-13 bg-gray-600 text-white rounded-full flex items-center justify-center text-3xl font-light shadow-lg hover:scale-105 hover:shadow-xl hover:bg-gray-700 transition-all duration-300 cursor-pointer ${isModalOpen ? 'rotate-45' : 'rotate-0'}`}
               aria-label="Add new chat"
             >
               <Plus size={32} />
             </button>
           </div>
 
-          {/* Resizable Divider */}
+          {/* Resizable Divider - Hidden on mobile */}
           <div
             onMouseDown={handleMouseDown}
-            className={`w-1 hover:w-2 bg-transparent hover:bg-[#3e3e42] cursor-col-resize transition-all ${isResizing ? 'w-2 bg-[#505050]' : ''}`}
+            className={`hidden md:block w-1 hover:w-2 bg-transparent hover:bg-[#3e3e42] cursor-col-resize transition-all ${isResizing ? 'w-2 bg-[#505050]' : ''}`}
             style={{ minWidth: '4px' }}
           />
 
@@ -315,6 +333,7 @@ export default function ChatPage() {
           <OpenChat 
             selectedFriend={selectedFriend}
             onClose={() => setSelectedFriend(null)}
+            isMobile={isMobile}
           />
         </div>
 
