@@ -25,12 +25,6 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   const { sendMessage: sendWSMessage, addMessageHandler } = useWebSocket();
   const { messages, addMessage, loading } = useMessages(selectedFriend?.fid);
 
-  // Debug logging
-  useEffect(() => {
-    console.log("OpenChat - selectedFriend:", selectedFriend);
-    console.log("OpenChat - selectedFriend?.fid:", selectedFriend?.fid);
-  }, [selectedFriend]);
-
   // Listen for incoming WebSocket messages
   useEffect(() => {
     if (!selectedFriend) return;
@@ -45,7 +39,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
 
       if (isForThisConversation) {
         const newMsg = {
-          id: incomingMessage.id,
+          id: incomingMessage.id || `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           text: incomingMessage.content,
           sender: incomingMessage.sender_id,
           timestamp: new Date(incomingMessage.created_at),
@@ -91,9 +85,11 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
     const sent = sendWSMessage(messageData);
     
     if (sent) {
-      // Optimistically add to UI
+      // Optimistically add to UI with a unique ID
+      // Use timestamp + random string to ensure uniqueness even for rapid messages
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const newMessage = {
-        id: Date.now().toString(),
+        id: uniqueId,
         text: message.trim(),
         sender: user.id,
         timestamp: new Date(),

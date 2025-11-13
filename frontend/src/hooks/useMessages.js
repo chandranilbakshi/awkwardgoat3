@@ -20,9 +20,7 @@ export function useMessages(friendId) {
 
   // Fetch message history with stale-while-revalidate pattern
   const fetchMessages = useCallback(async () => {
-    console.log("useMessages - fetchMessages called", { friendId, hasUser: !!user });
     if (!friendId || !user) {
-      console.log("useMessages - Skipping fetch: friendId or user missing");
       setLoading(false);
       return;
     }
@@ -32,7 +30,6 @@ export function useMessages(friendId) {
       const localMessages = loadMessages(user.id, friendId);
       
       if (localMessages && localMessages.length > 0) {
-        console.log("useMessages - Loading cached messages:", localMessages.length, "messages");
         setMessages(localMessages);
         setLoading(false); // Stop loading spinner, show cached data
       } else {
@@ -50,14 +47,11 @@ export function useMessages(friendId) {
         // Fetch only messages newer than last sync
         const sinceTimestamp = lastSync.toISOString();
         url += `&since=${encodeURIComponent(sinceTimestamp)}`;
-        console.log("useMessages - Incremental sync since:", sinceTimestamp);
       } else {
         // First sync, fetch all messages (limited)
         url += '&limit=100';
-        console.log("useMessages - Full sync (first time)");
       }
       
-      console.log("useMessages - Fetching from:", url);
       const response = await apiCall(url);
 
       if (!response.ok) {
@@ -65,7 +59,6 @@ export function useMessages(friendId) {
       }
 
       const data = await response.json();
-      console.log("useMessages - Received data:", data);
       
       // Transform messages to match UI format
       const newMessages = (data.messages || []).map((msg) => ({
@@ -75,14 +68,11 @@ export function useMessages(friendId) {
         timestamp: new Date(msg.created_at),
         isOwn: msg.sender_id === user?.id,
       }));
-
-      console.log("useMessages - New messages from server:", newMessages.length);
       
       // Step 3: Merge with existing messages (remove duplicates)
       let finalMessages;
       if (localMessages && localMessages.length > 0) {
         finalMessages = mergeMessages(localMessages, newMessages);
-        console.log("useMessages - Merged messages:", finalMessages.length);
       } else {
         finalMessages = newMessages;
       }
@@ -90,9 +80,18 @@ export function useMessages(friendId) {
       // Step 4: Update state and cache
       setMessages(finalMessages);
       
-      // Save to local storage with updated sync time
-      saveMessages(user.id, friendId, finalMessages, true);
-      console.log("useMessages - Synced and cached messages");
+      // Save to local storage (without updating sync time here)
+      saveMessages(user.id, friendId, finalMessages, false);
+      
+      // Update sync time based on the latest message timestamp
+      // This ensures we don't re-fetch messages we already have
+      if (finalMessages.length > 0) {
+        const latestMessage = finalMessages[finalMessages.length - 1];
+        updateLastSyncTime(user.id, friendId, latestMessage.timestamp);
+      } else {
+        // No messages yet, update sync time to now
+        updateLastSyncTime(user.id, friendId, new Date());
+      }
       
       setError(null);
     } catch (err) {
@@ -110,11 +109,16 @@ export function useMessages(friendId) {
     setMessages((prev) => {
       const updatedMessages = mergeMessages(prev, [message]);
       
-      // Save to local storage AND update sync time to prevent re-fetching this message
+      // Save to local storage and update sync time to the message's timestamp
+      // This prevents re-fetching this message from the server on next sync
       if (user && friendId) {
-        saveMessages(user.id, friendId, updatedMessages, true);
-        // Update sync time to the new message's timestamp to avoid duplicates
-        updateLastSyncTime(user.id, friendId, message.timestamp);
+        saveMessages(user.id, friendId, updatedMessages, false);
+        
+        // Update sync time to this message's timestamp (or latest message if older)
+        const latestMessage = updatedMessages[updatedMessages.length - 1];
+        if (latestMessage) {
+          updateLastSyncTime(user.id, friendId, latestMessage.timestamp);
+        }
       }
       
       return updatedMessages;
