@@ -154,24 +154,74 @@ func (c *Client) readPump() {
 	}()
 
 	for {
-		var msg Message
-		err := c.Conn.ReadJSON(&msg)
+		var wsMsg WebSocketMessage
+		err := c.Conn.ReadJSON(&wsMsg)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("WebSocket error: %v", err)
 			}
-			break
+			break // Exit loop on error
 		}
 
-		// Ensure user_id_1 < user_id_2 for consistency
-		userIDs := []string{msg.UserID1, msg.UserID2}
-		sort.Strings(userIDs)
-		msg.UserID1 = userIDs[0]
-		msg.UserID2 = userIDs[1]
-		msg.CreatedAt = time.Now()
+		switch wsMsg.Type {
 
-		// Broadcast message
-		hub.broadcast <- &msg
+		case MessageTypeChat:
+			var msg Message
+			err := json.Unmarshal(wsMsg.Payload, &msg)
+			if err != nil {
+				log.Printf("Error unmarshaling chat message: %v", err)
+				continue // Skip this message, continue loop
+			}
+
+			// Ensure user_id_1 < user_id_2 for consistency
+			userIDs := []string{msg.UserID1, msg.UserID2}
+			sort.Strings(userIDs)
+			msg.UserID1 = userIDs[0]
+			msg.UserID2 = userIDs[1]
+			msg.CreatedAt = time.Now()
+
+			// Broadcast message
+			hub.broadcast <- &msg
+
+		case MessageTypeCallOffer:
+			var sdpOffer CallSDP
+			err := json.Unmarshal(wsMsg.Payload, &sdpOffer)
+			if err != nil {
+				log.Printf("Error unmarshaling call-offer: %v", err)
+				continue
+			}
+			err = HandleSdpOffer(hub, c, &sdpOffer)
+			if err != nil {
+				fmt.Print(err)
+			}
+
+		case MessageTypeCallAnswer:
+			var sdpAnswer CallSDP
+			err := json.Unmarshal(wsMsg.Payload, &sdpAnswer)
+			if err != nil {
+				log.Printf("Error unmarshaling call-answer: %v", err)
+				continue
+			}
+			err = HandleSdpAnswer(hub, c, &sdpAnswer)
+			if err != nil {
+				log.Printf("Error handling answer: %v", err)
+			}
+
+		case MessageTypeIceCandidate:
+			var iceCandidate IceCandidate
+			err := json.Unmarshal(wsMsg.Payload, &iceCandidate)
+			if err != nil {
+				log.Printf("Error unmarshaling ice-candidate: %v", err)
+				continue
+			}
+			err = HandleIceCandidate(hub, c, &iceCandidate)
+			if err != nil {
+				log.Printf("Error handling ICE candidate: %v", err)
+			}
+
+		default:
+			log.Printf("Unknown message type: %s from user %s", wsMsg.Type, c.UserID)
+		}
 	}
 }
 
