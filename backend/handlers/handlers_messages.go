@@ -134,7 +134,7 @@ func HandleWebSocket(c *websocket.Conn) {
 	log.Printf("Authenticated WebSocket connection for user: %s", userID)
 
 	client := &Client{
-		UserID: userID, // Now we KNOW this is legitimate
+		UserID: userID,
 		Conn:   c,
 		Send:   make(chan []byte, 256),
 	}

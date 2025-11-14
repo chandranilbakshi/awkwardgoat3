@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function useWebSocket() {
-  const { user } = useAuth();
+  const { user, refreshSession, logout } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
   
@@ -14,6 +14,7 @@ export function useWebSocket() {
   const messageHandlersRef = useRef(new Set());
   const isConnectingRef = useRef(false);
   const userIdRef = useRef(null);
+  const tokenRefreshAttemptedRef = useRef(false);
 
   // Exponential backoff calculation (1s, 2s, 4s, 8s, 16s, max 30s)
   const getReconnectDelay = useCallback(() => {
@@ -21,9 +22,7 @@ export function useWebSocket() {
     return delay;
   }, []);
 
-  const accessToken = localStorage.getItem('access_token');
-
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     // Guard: Don't connect if no user
     if (!userIdRef.current) {
       console.log("⏸️ No user ID, skipping connection");
@@ -50,6 +49,17 @@ export function useWebSocket() {
 
     // Mark as connecting
     isConnectingRef.current = true;
+    
+    // Get current access token
+    const accessToken = localStorage.getItem('access_token');
+    
+    if (!accessToken) {
+      console.error("❌ No access token available");
+      isConnectingRef.current = false;
+      logout();
+      return;
+    }
+    
     const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'}/ws?token=${encodeURIComponent(accessToken)}`;
     console.log(`🔌 Connecting to WebSocket (Attempt ${reconnectAttemptsRef.current + 1})...`);
 
@@ -61,6 +71,7 @@ export function useWebSocket() {
         setIsConnected(true);
         isConnectingRef.current = false;
         reconnectAttemptsRef.current = 0; // Reset backoff on success
+        tokenRefreshAttemptedRef.current = false; // Reset token refresh flag
 
         // Clear any pending reconnection attempts
         if (reconnectTimeoutRef.current) {
@@ -95,9 +106,38 @@ export function useWebSocket() {
         isConnectingRef.current = false;
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = async (event) => {
         isConnectingRef.current = false;
         setIsConnected(false);
+
+        // Check if close was due to authentication failure (code 1008 = Policy Violation, or 1002 = Protocol Error)
+        // Backend sends 401 which translates to close code 1002 or 1008
+        const isAuthError = event.code === 1002 || event.code === 1008 || event.code === 1006;
+        
+        if (isAuthError && !tokenRefreshAttemptedRef.current && userIdRef.current) {
+          console.log("🔄 WebSocket auth failed, attempting token refresh...");
+          tokenRefreshAttemptedRef.current = true;
+          
+          try {
+            const refreshSuccess = await refreshSession();
+            
+            if (refreshSuccess) {
+              console.log("✅ Token refreshed, reconnecting WebSocket...");
+              // Reset reconnect attempts for fresh start with new token
+              reconnectAttemptsRef.current = 0;
+              
+              // Reconnect with new token immediately
+              setTimeout(() => connect(), 500);
+            } else {
+              console.error("❌ Token refresh failed, logging out...");
+              logout();
+            }
+          } catch (error) {
+            console.error("❌ Error during token refresh:", error);
+            logout();
+          }
+          return;
+        }
 
         // Only reconnect if we have a user and it wasn't a clean close
         if (userIdRef.current && event.code !== 1000) {
@@ -110,6 +150,7 @@ export function useWebSocket() {
           }, delay);
         } else if (event.code === 1000) {
           console.log("👋 WebSocket closed cleanly");
+          tokenRefreshAttemptedRef.current = false; // Reset on clean close
         }
       };
 
@@ -118,7 +159,7 @@ export function useWebSocket() {
       console.error("❌ Error creating WebSocket:", error);
       isConnectingRef.current = false;
     }
-  }, [getReconnectDelay]);
+  }, [getReconnectDelay, refreshSession, logout]);
 
   const disconnect = useCallback(() => {
     console.log("🔌 Disconnecting WebSocket...");
@@ -140,6 +181,7 @@ export function useWebSocket() {
     // Reset state
     isConnectingRef.current = false;
     reconnectAttemptsRef.current = 0;
+    tokenRefreshAttemptedRef.current = false;
     setIsConnected(false);
   }, []);
 

@@ -65,10 +65,3 @@ type Message struct {
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 }
-
-// Message history request
-type MessageHistoryRequest struct {
-	FriendID string `json:"friend_id"`
-	Limit    int    `json:"limit"`
-	Offset   int    `json:"offset"`
-}
