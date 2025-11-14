@@ -13,6 +13,8 @@ import {
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import CallModal from "@/components/CallModal";
 
 export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   const { user } = useAuth();
@@ -25,32 +27,89 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   const { sendMessage: sendWSMessage, addMessageHandler } = useWebSocket();
   const { messages, addMessage, loading } = useMessages(selectedFriend?.fid);
 
-  // Listen for incoming WebSocket messages
+  // WebRTC for calls
+  const {
+    callState,
+    otherUser,
+    isMuted,
+    callDuration,
+    remoteAudioRef,
+    startCall,
+    answerCall,
+    declineCall,
+    endCall,
+    toggleMute,
+    handleIncomingOffer,
+    handleIncomingAnswer,
+    handleIncomingIceCandidate,
+  } = useWebRTC(sendWSMessage);
+
+  // Listen for incoming WebSocket messages (chat + signaling)
   useEffect(() => {
     if (!selectedFriend) return;
 
     const removeHandler = addMessageHandler((incomingMessage) => {
-      // Only add message if it's for this conversation
-      const isForThisConversation =
-        (incomingMessage.user_id_1 === user?.id &&
-          incomingMessage.user_id_2 === selectedFriend.fid) ||
-        (incomingMessage.user_id_1 === selectedFriend.fid &&
-          incomingMessage.user_id_2 === user?.id);
+      const messageType = incomingMessage.type;
+      const messagePayload = incomingMessage.payload || incomingMessage;
 
-      if (isForThisConversation) {
-        const newMsg = {
-          id: incomingMessage.id || `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          text: incomingMessage.content,
-          sender: incomingMessage.sender_id,
-          timestamp: new Date(incomingMessage.created_at),
-          isOwn: incomingMessage.sender_id === user?.id,
-        };
-        addMessage(newMsg);
+      // Handle WebRTC signaling messages
+      if (messageType === "call-offer") {
+        // Only show if it's from the current chat friend
+        if (messagePayload.sender_id === selectedFriend.fid) {
+          handleIncomingOffer({
+            ...messagePayload,
+            name: selectedFriend.name,
+          });
+        }
+      } else if (messageType === "call-answer") {
+        handleIncomingAnswer(messagePayload);
+      } else if (messageType === "ice-candidate") {
+        handleIncomingIceCandidate(messagePayload);
+      } else if (messageType === "chat") {
+        // Handle chat messages
+        const actualMessage = messagePayload;
+        
+        const isForThisConversation =
+          (actualMessage.user_id_1 === user?.id &&
+            actualMessage.user_id_2 === selectedFriend.fid) ||
+          (actualMessage.user_id_1 === selectedFriend.fid &&
+            actualMessage.user_id_2 === user?.id);
+
+        if (isForThisConversation) {
+          const newMsg = {
+            id: actualMessage.id || `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text: actualMessage.content,
+            sender: actualMessage.sender_id,
+            timestamp: new Date(actualMessage.created_at),
+            isOwn: actualMessage.sender_id === user?.id,
+          };
+          addMessage(newMsg);
+        }
+      } else {
+        // Backward compatibility for unwrapped messages
+        const actualMessage = messagePayload;
+        
+        const isForThisConversation =
+          (actualMessage.user_id_1 === user?.id &&
+            actualMessage.user_id_2 === selectedFriend.fid) ||
+          (actualMessage.user_id_1 === selectedFriend.fid &&
+            actualMessage.user_id_2 === user?.id);
+
+        if (isForThisConversation) {
+          const newMsg = {
+            id: actualMessage.id || `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text: actualMessage.content,
+            sender: actualMessage.sender_id,
+            timestamp: new Date(actualMessage.created_at),
+            isOwn: actualMessage.sender_id === user?.id,
+          };
+          addMessage(newMsg);
+        }
       }
     });
 
     return removeHandler;
-  }, [selectedFriend, addMessageHandler, addMessage, user?.id]);
+  }, [selectedFriend, addMessageHandler, addMessage, user?.id, handleIncomingOffer, handleIncomingAnswer, handleIncomingIceCandidate]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -81,8 +140,14 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
       created_at: new Date().toISOString(),
     };
 
+    // Wrap message in WebSocketMessage format expected by backend
+    const wrappedMessage = {
+      type: "chat",
+      payload: messageData,
+    };
+
     // Send via WebSocket
-    const sent = sendWSMessage(messageData);
+    const sent = sendWSMessage(wrappedMessage);
     
     if (sent) {
       // Optimistically add to UI with a unique ID
@@ -133,6 +198,16 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
     return messageDate.toLocaleDateString();
   };
 
+  // Handle call button click
+  const handleCallClick = () => {
+    if (selectedFriend) {
+      startCall({
+        id: selectedFriend.fid,
+        name: selectedFriend.name,
+      });
+    }
+  };
+
   if (!selectedFriend) {
     return (
       <div className="hidden md:flex flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl p-4 items-center justify-center">
@@ -155,6 +230,19 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   if (isMobile) {
     return (
       <div className="fixed inset-0 bg-[#252526] flex flex-col z-10">
+        {/* Call Modal */}
+        <CallModal
+          callState={callState}
+          otherUser={otherUser}
+          isMuted={isMuted}
+          callDuration={callDuration}
+          onAnswer={answerCall}
+          onDecline={declineCall}
+          onEndCall={endCall}
+          onToggleMute={toggleMute}
+          remoteAudioRef={remoteAudioRef}
+        />
+
         {/* Mobile Messages Area - Full height, scrolls under header */}
         <div 
           className="absolute inset-0 overflow-y-auto px-4 pt-20 pb-24"
@@ -244,7 +332,10 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
           </div>
 
           <div className="flex items-center space-x-2">
-            <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
+            <button 
+              onClick={handleCallClick}
+              className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors"
+            >
               <Phone size={20} className="text-gray-100" />
             </button>
             <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
@@ -314,6 +405,19 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   // Desktop Layout
   return (
   <div className="flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl flex flex-col p-2 min-h-0 relative">
+    {/* Call Modal */}
+    <CallModal
+      callState={callState}
+      otherUser={otherUser}
+      isMuted={isMuted}
+      callDuration={callDuration}
+      onAnswer={answerCall}
+      onDecline={declineCall}
+      onEndCall={endCall}
+      onToggleMute={toggleMute}
+      remoteAudioRef={remoteAudioRef}
+    />
+
     {/* Desktop Top Bar */}
     <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-[#3e3e42] bg-[#252526]/85 backdrop-blur-md">
       <div className="flex items-center">
@@ -329,7 +433,10 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
       </div>
 
       <div className="flex items-center space-x-2">
-        <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">
+        <button 
+          onClick={handleCallClick}
+          className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors"
+        >
           <Phone size={20} className="text-gray-100" />
         </button>
         <button className="p-2 hover:bg-[#3e3e42] rounded-full transition-colors">

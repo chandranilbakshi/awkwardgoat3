@@ -83,12 +83,23 @@ export function useWebSocket() {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          setLastMessage(message);
+          
+          // Check if it's a wrapped message or raw message
+          let messageType = message.type;
+          let messagePayload = message;
+          
+          // If it has a type field and payload, it's wrapped
+          if (message.type && message.payload) {
+            messageType = message.type;
+            messagePayload = message.payload;
+          }
+          
+          setLastMessage({ type: messageType, payload: messagePayload });
 
-          // Call all registered message handlers
+          // Call all registered message handlers with both type and payload
           messageHandlersRef.current.forEach((handler) => {
             try {
-              handler(message);
+              handler({ type: messageType, payload: messagePayload });
             } catch (error) {
               console.error("Error in message handler:", error);
             }
