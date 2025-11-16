@@ -13,7 +13,7 @@ import {
 import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCall, sendWSMessage, addMessageHandler }) {
+export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCall, sendWSMessage, addMessageHandler, callState }) {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -194,9 +194,21 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
   if (isMobile) {
     return (
       <div className="fixed inset-0 bg-[#252526] flex flex-col z-10">
+        {/* Call Status Strip - Only show when call is active */}
+        {callState && callState !== "idle" && (
+          <div 
+            onClick={onClose}
+            className="fixed top-16 left-0 right-0 bg-green-600 hover:bg-green-700 cursor-pointer transition-colors z-30 px-4 py-0.5 flex items-center justify-center"
+          >
+            <span className="text-white flex items-center gap-1 text-sm font-medium"><ArrowLeft size={20} /> Go back to call</span>
+          </div>
+        )}
+
         {/* Mobile Messages Area - Full height, scrolls under header */}
         <div 
-          className="absolute inset-0 overflow-y-auto px-4 pt-20 pb-24"
+          className={`absolute inset-0 overflow-y-auto px-4 pb-24 ${
+            callState && callState !== "idle" ? "pt-28" : "pt-20"
+          }`}
           style={{
             scrollbarWidth: 'thin',
             scrollbarColor: '#3e3e42 transparent'

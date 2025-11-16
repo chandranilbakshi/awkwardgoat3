@@ -445,6 +445,7 @@ export default function ChatPage() {
           onStartCall={handleStartCall}
           sendWSMessage={sendWSMessage}
           addMessageHandler={addMessageHandler}
+          callState={callState}
         />
       </div>
 
