@@ -17,33 +17,19 @@ export default function CallModal({
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] animate-fadeIn" />
-
       {/* Modal */}
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
-        <div className="bg-[#252526] border border-[#3e3e42] rounded-3xl shadow-2xl w-full max-w-md animate-scaleIn">
+        <div className="bg-[#252526] border border-[#3e3e42] rounded-2xl shadow-2xl w-full max-w-md">
           {/* Header */}
-          <div className="p-6 text-center">
-            {/* User Avatar */}
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl font-bold text-white">
-                {otherUser?.name?.charAt(0).toUpperCase() || "U"}
-              </span>
-            </div>
-
-            {/* User Name */}
-            <h3 className="text-2xl font-semibold text-[#d4d4d4] mb-2">
-              {otherUser?.name || "Unknown User"}
-            </h3>
-
+          <div className="p-4 text-center flex justify-between">
             {/* Call Status */}
-            <div className="space-y-1">
+            <div className="space-y-1 flex flex-col items-start">
               {callState === "ringing" && (
                 <p className="text-[#858585] animate-pulse">Incoming call...</p>
               )}
@@ -51,74 +37,92 @@ export default function CallModal({
                 <p className="text-[#858585] animate-pulse">Calling...</p>
               )}
               {callState === "active" && (
-                <p className="text-green-400 font-mono text-lg">
+                <p className="text-green-400 font-mono text-sm">
                   {formatDuration(callDuration)}
                 </p>
               )}
+
+              {/* User Name */}
+              <h3 className="text-3xl font-semibold text-[#d4d4d4] mb-2">
+                {otherUser?.name || "Unknown User"}
+              </h3>
+            </div>
+
+            {/* User Avatar */}
+            <div className="w-15 h-15 bg-[#3e3e42] rounded-full flex items-center justify-center">
+              <span className="text-2xl font-bold text-white">
+                {otherUser?.name?.charAt(0).toUpperCase() || "U"}
+              </span>
             </div>
           </div>
 
           {/* Call Controls */}
           <div className="p-6 pt-0">
-            {/* Active Call Controls */}
-            {callState === "active" && (
-              <div className="flex items-center justify-center gap-4 mb-4">
-                {/* Mute Button */}
-                <button
-                  onClick={onToggleMute}
-                  className={`p-4 rounded-full transition-all duration-200 ${
-                    isMuted
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-[#3e3e42] hover:bg-[#505050]"
-                  }`}
-                  title={isMuted ? "Unmute" : "Mute"}
-                >
-                  {isMuted ? (
-                    <MicOff size={24} className="text-white" />
-                  ) : (
-                    <Mic size={24} className="text-gray-100" />
-                  )}
-                </button>
-              </div>
-            )}
-
             {/* Action Buttons */}
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-2">
               {/* Incoming Call: Answer & Decline */}
               {callState === "ringing" && (
                 <>
                   <button
                     onClick={onDecline}
-                    className="p-5 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-lg"
+                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
                     title="Decline"
                   >
-                    <PhoneOff size={28} className="text-white" />
+                    <PhoneOff size={24} className="text-white" /> Decline
                   </button>
 
                   <button
                     onClick={onAnswer}
-                    className="p-5 rounded-full bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-lg animate-pulse"
+                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-lg animate-pulse text-white"
                     title="Answer"
                   >
-                    <Phone size={28} className="text-white" />
+                    <Phone size={24} /> Answer
                   </button>
                 </>
               )}
 
-              {/* Outgoing/Active Call: End Button */}
-              {(callState === "calling" || callState === "active") && (
+              {/* Active Call: Mute & End */}
+              {callState === "active" && (
+                <>
+                  <button
+                    onClick={onToggleMute}
+                    className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
+                      isMuted
+                        ? "bg-red-600 hover:bg-red-700 active:bg-red-800"
+                        : "bg-[#3e3e42] hover:bg-[#505050] active:bg-[#606060]"
+                    }`}
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted ? (
+                      <MicOff size={24} className="text-white" />
+                    ) : (
+                      <Mic size={24} className="text-gray-100" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={onEndCall}
+                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
+                    title="End Call"
+                  >
+                    <PhoneOff size={24} className="text-white" /> Hang Up
+                  </button>
+                </>
+              )}
+
+              {/* Outgoing Call: End Button */}
+              {callState === "calling" && (
                 <button
                   onClick={onEndCall}
-                  className="p-5 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-lg"
+                  className="p-3 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-lg"
                   title="End Call"
                 >
-                  <PhoneOff size={28} className="text-white" />
+                  <PhoneOff size={24} className="text-white" />
                 </button>
               )}
             </div>
           </div>
         </div>
-      </div>
 
       {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudioRef} autoPlay playsInline />

@@ -1,9 +1,11 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useApi } from "@/hooks/useApi";
 
 export function useWebRTC(sendWSMessage) {
   const { user } = useAuth();
+  const { apiCall } = useApi();
   
   // State
   const [callState, setCallState] = useState("idle"); // idle, calling, ringing, active, ended
@@ -301,14 +303,8 @@ export function useWebRTC(sendWSMessage) {
     // Fetch sender's name from backend
     let senderName = "Unknown User";
     try {
-      const accessToken = localStorage.getItem("access_token");
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/get-name?id=${payload.sender_id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
+      const response = await apiCall(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/get-name?id=${payload.sender_id}`
       );
 
       if (response.ok) {
@@ -330,7 +326,7 @@ export function useWebRTC(sendWSMessage) {
     setOtherUser(sender);
     setCallState("ringing");
     showToast(`Incoming call from ${senderName}...`, "info");
-  }, []);
+  }, [apiCall]);
 
   // Handle incoming answer
   const handleIncomingAnswer = useCallback(async (payload) => {

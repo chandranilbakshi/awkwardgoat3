@@ -10,41 +10,20 @@ import {
   ArrowUp,
   ArrowLeft,
 } from "lucide-react";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import { useMessages } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
-import { useWebRTC } from "@/hooks/useWebRTC";
-import CallModal from "@/components/CallModal";
 
-export default function OpenChat({ selectedFriend, onClose, isMobile }) {
+export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCall, sendWSMessage, addMessageHandler }) {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
   const textAreaRef = useRef(null);
 
-  // WebSocket and messages
-  const { sendMessage: sendWSMessage, addMessageHandler } = useWebSocket();
+  // Messages
   const { messages, addMessage, loading } = useMessages(selectedFriend?.fid);
 
-  // WebRTC for calls
-  const {
-    callState,
-    otherUser,
-    isMuted,
-    callDuration,
-    remoteAudioRef,
-    startCall,
-    answerCall,
-    declineCall,
-    endCall,
-    toggleMute,
-    handleIncomingOffer,
-    handleIncomingAnswer,
-    handleIncomingIceCandidate,
-  } = useWebRTC(sendWSMessage);
-
-  // Listen for incoming WebSocket messages (chat + signaling)
+  // Listen for incoming WebSocket messages (chat only, signaling handled globally)
   useEffect(() => {
     if (!selectedFriend) return;
 
@@ -52,20 +31,8 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
       const messageType = incomingMessage.type;
       const messagePayload = incomingMessage.payload || incomingMessage;
 
-      // Handle WebRTC signaling messages
-      if (messageType === "call-offer") {
-        // Only show if it's from the current chat friend
-        if (messagePayload.sender_id === selectedFriend.fid) {
-          handleIncomingOffer({
-            ...messagePayload,
-            name: selectedFriend.name,
-          });
-        }
-      } else if (messageType === "call-answer") {
-        handleIncomingAnswer(messagePayload);
-      } else if (messageType === "ice-candidate") {
-        handleIncomingIceCandidate(messagePayload);
-      } else if (messageType === "chat") {
+      // Only handle chat messages here (signaling is handled globally)
+      if (messageType === "chat") {
         // Handle chat messages
         const actualMessage = messagePayload;
         
@@ -85,7 +52,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
           };
           addMessage(newMsg);
         }
-      } else {
+      } else if (!messageType) {
         // Backward compatibility for unwrapped messages
         const actualMessage = messagePayload;
         
@@ -109,7 +76,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
     });
 
     return removeHandler;
-  }, [selectedFriend, addMessageHandler, addMessage, user?.id, handleIncomingOffer, handleIncomingAnswer, handleIncomingIceCandidate]);
+  }, [selectedFriend, addMessageHandler, addMessage, user?.id]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -200,11 +167,8 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
 
   // Handle call button click
   const handleCallClick = () => {
-    if (selectedFriend) {
-      startCall({
-        id: selectedFriend.fid,
-        name: selectedFriend.name,
-      });
+    if (selectedFriend && onStartCall) {
+      onStartCall(selectedFriend);
     }
   };
 
@@ -230,19 +194,6 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   if (isMobile) {
     return (
       <div className="fixed inset-0 bg-[#252526] flex flex-col z-10">
-        {/* Call Modal */}
-        <CallModal
-          callState={callState}
-          otherUser={otherUser}
-          isMuted={isMuted}
-          callDuration={callDuration}
-          onAnswer={answerCall}
-          onDecline={declineCall}
-          onEndCall={endCall}
-          onToggleMute={toggleMute}
-          remoteAudioRef={remoteAudioRef}
-        />
-
         {/* Mobile Messages Area - Full height, scrolls under header */}
         <div 
           className="absolute inset-0 overflow-y-auto px-4 pt-20 pb-24"
@@ -405,19 +356,6 @@ export default function OpenChat({ selectedFriend, onClose, isMobile }) {
   // Desktop Layout
   return (
   <div className="flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl flex flex-col p-2 min-h-0 relative">
-    {/* Call Modal */}
-    <CallModal
-      callState={callState}
-      otherUser={otherUser}
-      isMuted={isMuted}
-      callDuration={callDuration}
-      onAnswer={answerCall}
-      onDecline={declineCall}
-      onEndCall={endCall}
-      onToggleMute={toggleMute}
-      remoteAudioRef={remoteAudioRef}
-    />
-
     {/* Desktop Top Bar */}
     <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between px-4 py-2 border rounded-2xl border-[#3e3e42] bg-[#252526]/85 backdrop-blur-md">
       <div className="flex items-center">
