@@ -25,7 +25,7 @@ export default function CallModal({
   return (
     <>
       {/* Modal */}
-        <div className="bg-[#252526] border border-[#3e3e42] rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="bg-[#252526] border border-[#3e3e42] md:rounded-2xl shadow-2xl w-full max-w-md">
           {/* Header */}
           <div className="p-4 text-center flex justify-between">
             {/* Call Status */}
@@ -57,7 +57,7 @@ export default function CallModal({
           </div>
 
           {/* Call Controls */}
-          <div className="p-6 pt-0">
+          <div className="p-4 pt-0">
             {/* Action Buttons */}
             <div className="flex items-center justify-center gap-2">
               {/* Incoming Call: Answer & Decline */}
@@ -65,7 +65,7 @@ export default function CallModal({
                 <>
                   <button
                     onClick={onDecline}
-                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
+                    className="p-2 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
                     title="Decline"
                   >
                     <PhoneOff size={24} className="text-white" /> Decline
@@ -73,7 +73,7 @@ export default function CallModal({
 
                   <button
                     onClick={onAnswer}
-                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-lg animate-pulse text-white"
+                    className="p-2 w-full rounded-full justify-center flex gap-3 bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-lg animate-pulse text-white"
                     title="Answer"
                   >
                     <Phone size={24} /> Answer
@@ -86,7 +86,7 @@ export default function CallModal({
                 <>
                   <button
                     onClick={onToggleMute}
-                    className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
+                    className={`p-2 rounded-full transition-all duration-200 shadow-lg ${
                       isMuted
                         ? "bg-red-600 hover:bg-red-700 active:bg-red-800"
                         : "bg-[#3e3e42] hover:bg-[#505050] active:bg-[#606060]"
@@ -102,7 +102,7 @@ export default function CallModal({
 
                   <button
                     onClick={onEndCall}
-                    className="p-3 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
+                    className="p-2 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
                     title="End Call"
                   >
                     <PhoneOff size={24} className="text-white" /> Hang Up
@@ -114,10 +114,10 @@ export default function CallModal({
               {callState === "calling" && (
                 <button
                   onClick={onEndCall}
-                  className="p-3 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-lg"
+                  className="p-2 w-full rounded-full justify-center flex gap-3 bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-lg"
                   title="End Call"
                 >
-                  <PhoneOff size={24} className="text-white" />
+                  <PhoneOff size={24} className="text-white" /> Hang Up
                 </button>
               )}
             </div>

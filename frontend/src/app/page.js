@@ -322,7 +322,7 @@ export default function ChatPage() {
         className="md:flex w-full relative h-full overflow-hidden"
       >
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col h-full gap-1">
         {/* Global Call Modal */}
         <CallModal
           callState={callState}
