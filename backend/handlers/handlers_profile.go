@@ -168,3 +168,80 @@ func HandleCreateProfile(c *fiber.Ctx) error {
 		"profile": profile[0],
 	})
 }
+
+func HandleCheckId(c *fiber.Ctx) error {
+	// Get the authorization header
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization header is required",
+		})
+	}
+
+	// Extract the token
+	token := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	// Verify the authenticated user
+	client := authClient.WithToken(token)
+	_, err := client.GetUser()
+
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid or expired token",
+		})
+	}
+
+	// Get the user ID from query parameter or path parameter
+	userId := c.Query("id")
+	if userId == "" {
+		userId = c.Params("id")
+	}
+
+	if userId == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "User ID is required",
+		})
+	}
+
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_KEY")
+
+	// Check if profile exists and get only the name column
+	req, err := http.NewRequest("GET", supabaseURL+"/rest/v1/user_profiles?id=eq."+userId+"&select=name", nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check profile",
+		})
+	}
+
+	req.Header.Set("apikey", supabaseKey)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check profile",
+		})
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var profiles []map[string]interface{}
+	json.Unmarshal(body, &profiles)
+
+	result := fiber.Map{
+		"exists": len(profiles) > 0,
+	}
+
+	// If profile exists, include the name
+	if len(profiles) > 0 {
+		if name, ok := profiles[0]["name"]; ok {
+			result["name"] = name
+		}
+	}
+
+	return c.JSON(result)
+}

@@ -26,6 +26,8 @@ func SetupRoutes(app *fiber.App) {
 	// Profile routes
 	app.Post("/api/user/create-profile", handlers.HandleCreateProfile)
 	app.Get("/api/user/check-profile", handlers.HandleCheckProfile)
+	app.Get("/api/user/get-name/:id", handlers.HandleCheckId) // Path parameter
+	app.Get("/api/user/get-name", handlers.HandleCheckId)     // Query parameter
 
 	// User search
 	app.Get("/api/user/search-by-uid/:uid", utils.HandleSearchByUID)

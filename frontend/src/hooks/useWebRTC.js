@@ -295,19 +295,41 @@ export function useWebRTC(sendWSMessage) {
   }, []);
 
   // Handle incoming offer
-  const handleIncomingOffer = useCallback((payload) => {
+  const handleIncomingOffer = useCallback(async (payload) => {
     console.log("📞 Incoming call from:", payload.sender_id);
     
-    // Find sender info (you'll need to pass this or get it from context)
+    // Fetch sender's name from backend
+    let senderName = "Unknown User";
+    try {
+      const accessToken = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/get-name?id=${payload.sender_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.exists && data.name) {
+          senderName = data.name;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching sender name:", error);
+    }
+
     const sender = {
       id: payload.sender_id,
-      name: "User", // You can enhance this later
+      name: senderName,
     };
 
     pendingOfferRef.current = payload;
     setOtherUser(sender);
     setCallState("ringing");
-    showToast("Incoming call...", "info");
+    showToast(`Incoming call from ${senderName}...`, "info");
   }, []);
 
   // Handle incoming answer
