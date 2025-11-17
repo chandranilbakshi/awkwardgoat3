@@ -6,13 +6,13 @@ import { useApi } from "@/hooks/useApi";
 export function useWebRTC(sendWSMessage) {
   const { user } = useAuth();
   const { apiCall } = useApi();
-  
+
   // State
   const [callState, setCallState] = useState("idle"); // idle, calling, ringing, active, ended
   const [otherUser, setOtherUser] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
-  
+
   // Refs
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -26,8 +26,16 @@ export function useWebRTC(sendWSMessage) {
   // WebRTC configuration with Google's STUN server
   const peerConnectionConfig = {
     iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
       {
-        urls: "stun:stun.l.google.com:19302",
+        urls: "turn:zibro.live:3478?transport=udp",
+        username: "webrtcturn",
+        credential: "f7bd53c8cb3018e4c27bb2aaabc2a1f6",
+      },
+      {
+        urls: "turns:zibro.live:5349?transport=tcp",
+        username: "webrtcturn",
+        credential: "f7bd53c8cb3018e4c27bb2aaabc2a1f6",
       },
     ],
   };
@@ -36,7 +44,9 @@ export function useWebRTC(sendWSMessage) {
   const startCallTimer = useCallback(() => {
     callStartTimeRef.current = Date.now();
     durationIntervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - callStartTimeRef.current) / 1000);
+      const elapsed = Math.floor(
+        (Date.now() - callStartTimeRef.current) / 1000
+      );
       setCallDuration(elapsed);
     }, 1000);
   }, []);
@@ -52,73 +62,82 @@ export function useWebRTC(sendWSMessage) {
   }, []);
 
   // Initialize peer connection
-  const initializePeerConnection = useCallback((targetUser) => {
-    if (peerConnectionRef.current) {
-      return peerConnectionRef.current;
-    }
-
-    const pc = new RTCPeerConnection(peerConnectionConfig);
-
-    // Handle ICE candidates
-    pc.onicecandidate = (event) => {
-      if (event.candidate && targetUser) {
-        console.log("📡 Sending ICE candidate");
-        sendWSMessage({
-          type: "ice-candidate",
-          payload: {
-            sender_id: user.id,
-            receiver_id: targetUser.id,
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-            sdpIndex: event.candidate.sdpMLineIndex,
-          },
-        });
+  const initializePeerConnection = useCallback(
+    (targetUser) => {
+      if (peerConnectionRef.current) {
+        return peerConnectionRef.current;
       }
-    };
 
-    // Handle remote track
-    pc.ontrack = (event) => {
-      console.log("🎵 Received remote audio track");
-      remoteStreamRef.current = event.streams[0];
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = event.streams[0];
-      }
-    };
+      const pc = new RTCPeerConnection(peerConnectionConfig);
 
-    // Handle connection state changes
-    pc.oniceconnectionstatechange = () => {
-      console.log("🔌 ICE Connection State:", pc.iceConnectionState);
-      
-      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
-        setCallState("active");
-        startCallTimer();
-        showToast("Call connected!", "success");
-      } else if (pc.iceConnectionState === "failed") {
-        showToast("Connection failed. Please try again.", "error");
-        endCall();
-      } else if (pc.iceConnectionState === "disconnected") {
-        showToast("Call disconnected", "info");
-        endCall();
-      }
-    };
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate && targetUser) {
+          console.log("📡 Sending ICE candidate");
+          sendWSMessage({
+            type: "ice-candidate",
+            payload: {
+              sender_id: user.id,
+              receiver_id: targetUser.id,
+              candidate: event.candidate.candidate,
+              sdpMid: event.candidate.sdpMid,
+              sdpIndex: event.candidate.sdpMLineIndex,
+            },
+          });
+        }
+      };
 
-    peerConnectionRef.current = pc;
-    return pc;
-  }, [user, sendWSMessage, startCallTimer]);
+      // Handle remote track
+      pc.ontrack = (event) => {
+        console.log("🎵 Received remote audio track");
+        remoteStreamRef.current = event.streams[0];
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      // Handle connection state changes
+      pc.oniceconnectionstatechange = () => {
+        console.log("🔌 ICE Connection State:", pc.iceConnectionState);
+
+        if (
+          pc.iceConnectionState === "connected" ||
+          pc.iceConnectionState === "completed"
+        ) {
+          setCallState("active");
+          startCallTimer();
+          showToast("Call connected!", "success");
+        } else if (pc.iceConnectionState === "failed") {
+          showToast("Connection failed. Please try again.", "error");
+          endCall();
+        } else if (pc.iceConnectionState === "disconnected") {
+          showToast("Call disconnected", "info");
+          endCall();
+        }
+      };
+
+      peerConnectionRef.current = pc;
+      return pc;
+    },
+    [user, sendWSMessage, startCallTimer]
+  );
 
   // Get microphone access
   const getLocalStream = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: false 
+        video: false,
       });
       localStreamRef.current = stream;
       return stream;
     } catch (error) {
       console.error("❌ Microphone access error:", error);
       if (error.name === "NotAllowedError") {
-        showToast("Microphone access denied. Please allow microphone access in your browser settings.", "error");
+        showToast(
+          "Microphone access denied. Please allow microphone access in your browser settings.",
+          "error"
+        );
       } else if (error.name === "NotFoundError") {
         showToast("No microphone found. Please connect a microphone.", "error");
       } else {
@@ -129,48 +148,51 @@ export function useWebRTC(sendWSMessage) {
   }, []);
 
   // Start call (caller side)
-  const startCall = useCallback(async (friend) => {
-    try {
-      console.log("📞 Starting call to:", friend.name);
-      setOtherUser(friend);
-      setCallState("calling");
-      showToast(`Calling ${friend.name}...`, "info");
+  const startCall = useCallback(
+    async (friend) => {
+      try {
+        console.log("📞 Starting call to:", friend.name);
+        setOtherUser(friend);
+        setCallState("calling");
+        showToast(`Calling ${friend.name}...`, "info");
 
-      // Get microphone access
-      const stream = await getLocalStream();
+        // Get microphone access
+        const stream = await getLocalStream();
 
-      // Initialize peer connection
-      const pc = initializePeerConnection();
+        // Initialize peer connection
+        const pc = initializePeerConnection();
 
-      // Add audio tracks
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
-      });
+        // Add audio tracks
+        stream.getTracks().forEach((track) => {
+          pc.addTrack(track, stream);
+        });
 
-      // Create offer
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
 
-      // Send offer to backend
-      sendWSMessage({
-        type: "call-offer",
-        payload: {
-          call_type: 0, // Audio
-          sdp_type: 0, // Offer
-          sender_id: user.id,
-          receiver_id: friend.id,
-          sdp_string: offer.sdp,
-          time: new Date().toISOString(),
-        },
-      });
+        // Send offer to backend
+        sendWSMessage({
+          type: "call-offer",
+          payload: {
+            call_type: 0, // Audio
+            sdp_type: 0, // Offer
+            sender_id: user.id,
+            receiver_id: friend.id,
+            sdp_string: offer.sdp,
+            time: new Date().toISOString(),
+          },
+        });
 
-      console.log("✅ Call offer sent");
-    } catch (error) {
-      console.error("❌ Error starting call:", error);
-      setCallState("idle");
-      cleanup();
-    }
-  }, [user, getLocalStream, initializePeerConnection, sendWSMessage]);
+        console.log("✅ Call offer sent");
+      } catch (error) {
+        console.error("❌ Error starting call:", error);
+        setCallState("idle");
+        cleanup();
+      }
+    },
+    [user, getLocalStream, initializePeerConnection, sendWSMessage]
+  );
 
   // Answer call (callee side)
   const answerCall = useCallback(async () => {
@@ -185,12 +207,15 @@ export function useWebRTC(sendWSMessage) {
       showToast("Connecting...", "info");
 
       const offer = pendingOfferRef.current;
-      
+
       // Get microphone access
       const stream = await getLocalStream();
 
       // Initialize peer connection
-      const pc = initializePeerConnection({ id: offer.sender_id, name: otherUser?.name });
+      const pc = initializePeerConnection({
+        id: offer.sender_id,
+        name: otherUser?.name,
+      });
 
       // Add audio tracks
       stream.getTracks().forEach((track) => {
@@ -280,7 +305,7 @@ export function useWebRTC(sendWSMessage) {
 
     // Clear ICE candidate queue
     iceCandidateQueueRef.current = [];
-    
+
     setIsMuted(false);
   }, []);
 
@@ -291,73 +316,86 @@ export function useWebRTC(sendWSMessage) {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
-        showToast(audioTrack.enabled ? "Microphone on" : "Microphone muted", "info");
+        showToast(
+          audioTrack.enabled ? "Microphone on" : "Microphone muted",
+          "info"
+        );
       }
     }
   }, []);
 
   // Handle incoming offer
-  const handleIncomingOffer = useCallback(async (payload) => {
-    console.log("📞 Incoming call from:", payload.sender_id);
-    
-    // Fetch sender's name from backend
-    let senderName = "Unknown User";
-    try {
-      const response = await apiCall(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/user/get-name?id=${payload.sender_id}`
-      );
+  const handleIncomingOffer = useCallback(
+    async (payload) => {
+      console.log("📞 Incoming call from:", payload.sender_id);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.exists && data.name) {
-          senderName = data.name;
+      // Fetch sender's name from backend
+      let senderName = "Unknown User";
+      try {
+        const response = await apiCall(
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+          }/api/user/get-name?id=${payload.sender_id}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.exists && data.name) {
+            senderName = data.name;
+          }
         }
+      } catch (error) {
+        console.error("Error fetching sender name:", error);
       }
-    } catch (error) {
-      console.error("Error fetching sender name:", error);
-    }
 
-    const sender = {
-      id: payload.sender_id,
-      name: senderName,
-    };
+      const sender = {
+        id: payload.sender_id,
+        name: senderName,
+      };
 
-    pendingOfferRef.current = payload;
-    setOtherUser(sender);
-    setCallState("ringing");
-    showToast(`Incoming call from ${senderName}...`, "info");
-  }, [apiCall]);
+      pendingOfferRef.current = payload;
+      setOtherUser(sender);
+      setCallState("ringing");
+      showToast(`Incoming call from ${senderName}...`, "info");
+    },
+    [apiCall]
+  );
 
   // Handle incoming answer
-  const handleIncomingAnswer = useCallback(async (payload) => {
-    console.log("✅ Received call answer");
-    
-    if (!peerConnectionRef.current) {
-      console.error("No peer connection to set answer");
-      return;
-    }
+  const handleIncomingAnswer = useCallback(
+    async (payload) => {
+      console.log("✅ Received call answer");
 
-    try {
-      await peerConnectionRef.current.setRemoteDescription(
-        new RTCSessionDescription({
-          type: "answer",
-          sdp: payload.sdp_string,
-        })
-      );
-
-      // Process queued ICE candidates
-      while (iceCandidateQueueRef.current.length > 0) {
-        const candidate = iceCandidateQueueRef.current.shift();
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+      if (!peerConnectionRef.current) {
+        console.error("No peer connection to set answer");
+        return;
       }
 
-      console.log("✅ Answer processed successfully");
-    } catch (error) {
-      console.error("❌ Error processing answer:", error);
-      showToast("Failed to establish connection", "error");
-      endCall();
-    }
-  }, [endCall]);
+      try {
+        await peerConnectionRef.current.setRemoteDescription(
+          new RTCSessionDescription({
+            type: "answer",
+            sdp: payload.sdp_string,
+          })
+        );
+
+        // Process queued ICE candidates
+        while (iceCandidateQueueRef.current.length > 0) {
+          const candidate = iceCandidateQueueRef.current.shift();
+          await peerConnectionRef.current.addIceCandidate(
+            new RTCIceCandidate(candidate)
+          );
+        }
+
+        console.log("✅ Answer processed successfully");
+      } catch (error) {
+        console.error("❌ Error processing answer:", error);
+        showToast("Failed to establish connection", "error");
+        endCall();
+      }
+    },
+    [endCall]
+  );
 
   // Handle incoming ICE candidate
   const handleIncomingIceCandidate = useCallback(async (payload) => {
@@ -369,9 +407,14 @@ export function useWebRTC(sendWSMessage) {
       sdpMLineIndex: payload.sdpIndex,
     };
 
-    if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+    if (
+      peerConnectionRef.current &&
+      peerConnectionRef.current.remoteDescription
+    ) {
       try {
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        await peerConnectionRef.current.addIceCandidate(
+          new RTCIceCandidate(candidate)
+        );
       } catch (error) {
         console.error("❌ Error adding ICE candidate:", error);
       }
@@ -418,9 +461,9 @@ function showToast(message, type = "info") {
       : "bg-blue-600"
   }`;
   toast.textContent = message;
-  
+
   document.body.appendChild(toast);
-  
+
   // Remove after 3 seconds
   setTimeout(() => {
     toast.classList.add("animate-slideDown");
