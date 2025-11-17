@@ -8,3 +8,4 @@ README.md
 .idea
 node_modules
 .next
+docker-compose.prod.yml

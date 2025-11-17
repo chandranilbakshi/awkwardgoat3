@@ -1,0 +1,4 @@
+# Zip files
+*.tar
+*.tar.gz
+*.tgz

@@ -25,19 +25,22 @@ export function useWebRTC(sendWSMessage) {
 
   // WebRTC configuration with Google's STUN server
   const peerConnectionConfig = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      {
-        urls: "turn:zibro.live:3478?transport=udp",
-        username: "webrtcturn",
-        credential: "f7bd53c8cb3018e4c27bb2aaabc2a1f6",
-      },
-      {
-        urls: "turns:zibro.live:5349?transport=tcp",
-        username: "webrtcturn",
-        credential: "f7bd53c8cb3018e4c27bb2aaabc2a1f6",
-      },
-    ],
+      iceServers: [
+    // Keep Google's stun for fallback
+    { urls: "stun:stun.l.google.com:19302" },
+
+    {
+      urls: [
+        "stun:zibro.live:3478",
+        "turn:zibro.live:3478?transport=udp",
+        "turn:zibro.live:3478?transport=tcp",
+        "turns:zibro.live:5349?transport=tcp",
+      ],
+      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+    },
+  ]
+,
   };
 
   // Start call duration timer
