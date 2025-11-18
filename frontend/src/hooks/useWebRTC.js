@@ -23,25 +23,37 @@ export function useWebRTC(sendWSMessage) {
   const callStartTimeRef = useRef(null);
   const durationIntervalRef = useRef(null);
 
-  // WebRTC configuration with Google's STUN server
-  const peerConnectionConfig = {
-      iceServers: [
-    // Keep Google's stun for fallback
+const peerConnectionConfig = {
+  iceServers: [
+    // 1. STUN for direct P2P (fastest possible)
     { urls: "stun:stun.l.google.com:19302" },
 
+    // // Try UDP first
+    // {
+    //   urls: "turns:zibro.live:443?transport=udp",
+    //   username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+    //   credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+    // },
+
+    // Fallback: TURN over TLS
     {
-      urls: [
-        "stun:zibro.live:3478",
-        "turn:zibro.live:3478?transport=udp",
-        "turn:zibro.live:3478?transport=tcp",
-        "turns:zibro.live:5349?transport=tcp",
-      ],
+      urls: "turns:zibro.live:443?transport=tcp",
       username: process.env.NEXT_PUBLIC_TURN_USERNAME,
       credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
     },
-  ]
-,
-  };
+
+    // First: TURN over TCP (port 3478)
+    {
+      urls: "turn:zibro.live:3478?transport=tcp",
+      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+    },
+
+  ],
+
+  // Force TURN usage only (no STUN or direct) --Testing Only
+  // iceTransportPolicy: "relay"
+};
 
   // Start call duration timer
   const startCallTimer = useCallback(() => {
@@ -76,7 +88,6 @@ export function useWebRTC(sendWSMessage) {
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
         if (event.candidate && targetUser) {
-          console.log("📡 Sending ICE candidate");
           sendWSMessage({
             type: "ice-candidate",
             payload: {
@@ -92,17 +103,15 @@ export function useWebRTC(sendWSMessage) {
 
       // Handle remote track
       pc.ontrack = (event) => {
-        console.log("🎵 Received remote audio track");
+        console.log("🎵 Remote audio track received");
         remoteStreamRef.current = event.streams[0];
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
       };
 
-      // Handle connection state changes
+      // Handle ICE connection state changes
       pc.oniceconnectionstatechange = () => {
-        console.log("🔌 ICE Connection State:", pc.iceConnectionState);
-
         if (
           pc.iceConnectionState === "connected" ||
           pc.iceConnectionState === "completed"
@@ -159,34 +168,26 @@ export function useWebRTC(sendWSMessage) {
         setCallState("calling");
         showToast(`Calling ${friend.name}...`, "info");
 
-        // Get microphone access
         const stream = await getLocalStream();
-
-        // Initialize peer connection
-        const pc = initializePeerConnection();
-
-        // Add audio tracks
+        const pc = initializePeerConnection(friend);
         stream.getTracks().forEach((track) => {
           pc.addTrack(track, stream);
         });
 
-        // Create offer
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Send offer to backend
         sendWSMessage({
           type: "call-offer",
           payload: {
-            call_type: 0, // Audio
-            sdp_type: 0, // Offer
+            call_type: 0,
+            sdp_type: 0,
             sender_id: user.id,
             receiver_id: friend.id,
             sdp_string: offer.sdp,
             time: new Date().toISOString(),
           },
         });
-
         console.log("✅ Call offer sent");
       } catch (error) {
         console.error("❌ Error starting call:", error);
@@ -210,22 +211,16 @@ export function useWebRTC(sendWSMessage) {
       showToast("Connecting...", "info");
 
       const offer = pendingOfferRef.current;
-
-      // Get microphone access
       const stream = await getLocalStream();
-
-      // Initialize peer connection
       const pc = initializePeerConnection({
         id: offer.sender_id,
         name: otherUser?.name,
       });
 
-      // Add audio tracks
       stream.getTracks().forEach((track) => {
         pc.addTrack(track, stream);
       });
 
-      // Set remote description (the offer)
       await pc.setRemoteDescription(
         new RTCSessionDescription({
           type: "offer",
@@ -233,22 +228,19 @@ export function useWebRTC(sendWSMessage) {
         })
       );
 
-      // Process queued ICE candidates
       while (iceCandidateQueueRef.current.length > 0) {
         const candidate = iceCandidateQueueRef.current.shift();
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
 
-      // Create answer
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      // Send answer to backend
       sendWSMessage({
         type: "call-answer",
         payload: {
-          call_type: 0, // Audio
-          sdp_type: 1, // Answer
+          call_type: 0,
+          sdp_type: 1,
           sender_id: user.id,
           receiver_id: offer.sender_id,
           sdp_string: answer.sdp,
@@ -332,7 +324,6 @@ export function useWebRTC(sendWSMessage) {
     async (payload) => {
       console.log("📞 Incoming call from:", payload.sender_id);
 
-      // Fetch sender's name from backend
       let senderName = "Unknown User";
       try {
         const response = await apiCall(
@@ -382,7 +373,6 @@ export function useWebRTC(sendWSMessage) {
           })
         );
 
-        // Process queued ICE candidates
         while (iceCandidateQueueRef.current.length > 0) {
           const candidate = iceCandidateQueueRef.current.shift();
           await peerConnectionRef.current.addIceCandidate(
@@ -402,8 +392,6 @@ export function useWebRTC(sendWSMessage) {
 
   // Handle incoming ICE candidate
   const handleIncomingIceCandidate = useCallback(async (payload) => {
-    console.log("📡 Received ICE candidate");
-
     const candidate = {
       candidate: payload.candidate,
       sdpMid: payload.sdpMid,
@@ -419,10 +407,9 @@ export function useWebRTC(sendWSMessage) {
           new RTCIceCandidate(candidate)
         );
       } catch (error) {
-        console.error("❌ Error adding ICE candidate:", error);
+        console.error("Error adding ICE candidate:", error);
       }
     } else {
-      // Queue candidate if remote description not set yet
       iceCandidateQueueRef.current.push(candidate);
     }
   }, []);
