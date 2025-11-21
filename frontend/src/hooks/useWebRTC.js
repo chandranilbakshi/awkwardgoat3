@@ -3,19 +3,12 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
 
-// Debug: Log environment variables on module load
-console.log("🔧 [WebRTC] Environment Variables:");
-console.log("  NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
-console.log("  NEXT_PUBLIC_WS_URL:", process.env.NEXT_PUBLIC_WS_URL);
-console.log("  NEXT_PUBLIC_TURN_USERNAME:", process.env.NEXT_PUBLIC_TURN_USERNAME);
-console.log("  NEXT_PUBLIC_TURN_CREDENTIALS:", process.env.NEXT_PUBLIC_TURN_CREDENTIALS);
-
 export function useWebRTC(sendWSMessage) {
   const { user } = useAuth();
   const { apiCall } = useApi();
 
   // State
-  const [callState, setCallState] = useState("idle"); // idle, calling, ringing, active, ended
+  const [callState, setCallState] = useState("idle");
   const [otherUser, setOtherUser] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
@@ -29,40 +22,86 @@ export function useWebRTC(sendWSMessage) {
   const pendingOfferRef = useRef(null);
   const callStartTimeRef = useRef(null);
   const durationIntervalRef = useRef(null);
+  const wakeLockRef = useRef(null);
 
-const peerConnectionConfig = {
-  iceServers: [
-    // 1. STUN for direct P2P (fastest possible)
-    { urls: "stun:stun.l.google.com:19302" },
+  const peerConnectionConfig = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turns:zibro.live:443?transport=tcp",
+        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+      },
+      {
+        urls: "turn:zibro.live:3478?transport=tcp",
+        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+      },
+    ],
+  };
 
-    // // Try UDP first
-    // {
-    //   urls: "turns:zibro.live:443?transport=udp",
-    //   username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-    //   credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
-    // },
+  // ============================================
+  // WAKE LOCK API - Keeps screen on during call
+  // ============================================
+  const requestWakeLock = useCallback(async () => {
+    // Check if Wake Lock API is supported
+    if (!("wakeLock" in navigator)) {
+      console.log("⚠️ Wake Lock API not supported on this browser");
+      showToast("Wake Lock not supported. Screen may turn off during call.", "info");
+      return;
+    }
 
-    // Fallback: TURN over TLS
-    {
-      urls: "turns:zibro.live:443?transport=tcp",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
-    },
+    try {
+      console.log("🔒 Requesting Wake Lock...");
+      
+      // Request a screen wake lock
+      wakeLockRef.current = await navigator.wakeLock.request("screen");
+      
+      console.log("✅ Wake Lock acquired! Screen will stay on during call.");
+      showToast("Screen will stay on during call", "success");
 
-    // First: TURN over TCP (port 3478)
-    {
-      urls: "turn:zibro.live:3478?transport=tcp",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
-    },
+      // Listen for wake lock release (happens when screen is manually locked or tab changes)
+      wakeLockRef.current.addEventListener("release", () => {
+        console.log("🔓 Wake Lock released");
+      });
 
-  ],
+    } catch (error) {
+      console.error("❌ Failed to acquire Wake Lock:", error);
+      
+      if (error.name === "NotAllowedError") {
+        showToast("Unable to keep screen on. Please keep app active.", "error");
+      } else {
+        showToast("Screen may turn off during call", "info");
+      }
+    }
+  }, []);
 
-  // Force TURN usage only (no STUN or direct) --Testing Only
-  // iceTransportPolicy: "relay"
-};
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        console.log("🔓 Releasing Wake Lock...");
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log("✅ Wake Lock released successfully");
+      } catch (error) {
+        console.error("❌ Error releasing Wake Lock:", error);
+      }
+    }
+  }, []);
 
-  // Start call duration timer
+  // Re-acquire wake lock if page becomes visible again
+  const handleVisibilityChange = useCallback(async () => {
+    if (document.visibilityState === "visible" && callState === "active") {
+      console.log("📱 Page became visible, re-acquiring Wake Lock...");
+      await requestWakeLock();
+    } else if (document.visibilityState === "hidden") {
+      console.log("📱 Page became hidden");
+    }
+  }, [callState, requestWakeLock]);
+
+  // ============================================
+  // CALL DURATION TIMER
+  // ============================================
   const startCallTimer = useCallback(() => {
     callStartTimeRef.current = Date.now();
     durationIntervalRef.current = setInterval(() => {
@@ -73,7 +112,6 @@ const peerConnectionConfig = {
     }, 1000);
   }, []);
 
-  // Stop call duration timer
   const stopCallTimer = useCallback(() => {
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
@@ -83,23 +121,22 @@ const peerConnectionConfig = {
     callStartTimeRef.current = null;
   }, []);
 
-  // Initialize peer connection
+  // ============================================
+  // PEER CONNECTION INITIALIZATION
+  // ============================================
   const initializePeerConnection = useCallback(
     (targetUser) => {
       if (peerConnectionRef.current) {
         return peerConnectionRef.current;
       }
 
+      console.log("🔗 Initializing peer connection");
       const pc = new RTCPeerConnection(peerConnectionConfig);
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log('🧊 ICE Candidate:', event.candidate.candidate);
-          console.log('🧊 ICE Candidate Type:', event.candidate.type);
-          console.log('🧊 ICE Candidate Protocol:', event.candidate.protocol);
-        }
         if (event.candidate && targetUser) {
+          console.log("🧊 ICE Candidate Type:", event.candidate.type);
           sendWSMessage({
             type: "ice-candidate",
             payload: {
@@ -124,55 +161,69 @@ const peerConnectionConfig = {
 
       // Handle ICE connection state changes
       pc.oniceconnectionstatechange = () => {
+        console.log("🔌 ICE Connection State:", pc.iceConnectionState);
+        
         if (
           pc.iceConnectionState === "connected" ||
           pc.iceConnectionState === "completed"
         ) {
           setCallState("active");
           startCallTimer();
+          
+          // Request Wake Lock when call is connected
+          requestWakeLock();
+          
           showToast("Call connected!", "success");
         } else if (pc.iceConnectionState === "failed") {
+          console.error("❌ ICE connection failed");
           showToast("Connection failed. Please try again.", "error");
           endCall();
         } else if (pc.iceConnectionState === "disconnected") {
+          console.log("⚠️ ICE connection disconnected");
           showToast("Call disconnected", "info");
           endCall();
         }
       };
 
-      // Handle connection state changes
+      // Additional connection state monitoring
       pc.onconnectionstatechange = () => {
         console.log("🔗 Connection State:", pc.connectionState);
-      };
-
-      // Handle ICE gathering state changes
-      pc.onicegatheringstatechange = () => {
-        console.log("🌐 ICE Gathering State:", pc.iceGatheringState);
-      };
-
-      // Handle signaling state changes
-      pc.onsignalingstatechange = () => {
-        console.log("📶 Signaling State:", pc.signalingState);
       };
 
       peerConnectionRef.current = pc;
       return pc;
     },
-    [user, sendWSMessage, startCallTimer]
+    [user, sendWSMessage, startCallTimer, requestWakeLock]
   );
 
-  // Get microphone access
+  // ============================================
+  // GET LOCAL STREAM
+  // ============================================
   const getLocalStream = useCallback(async () => {
-    console.log("⏱️ [getLocalStream] Starting microphone access...");
-    const startTime = performance.now();
     try {
+      console.log("🎤 Requesting microphone access");
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: false,
       });
-      const duration = (performance.now() - startTime).toFixed(2);
-      console.log(`✅ [getLocalStream] Microphone access granted in ${duration}ms`);
+      
       localStreamRef.current = stream;
+      console.log("✅ Microphone access granted");
+      
+      // Log audio track status
+      stream.getAudioTracks().forEach((track, index) => {
+        console.log(`🎤 Audio Track ${index}:`, {
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState,
+          label: track.label,
+        });
+      });
+      
       return stream;
     } catch (error) {
       console.error("❌ Microphone access error:", error);
@@ -190,12 +241,13 @@ const peerConnectionConfig = {
     }
   }, []);
 
-  // Start call (caller side)
+  // ============================================
+  // START CALL
+  // ============================================
   const startCall = useCallback(
     async (friend) => {
-      const callStartTime = performance.now();
       try {
-        console.log("📞 [startCall] Starting call to:", friend.name);
+        console.log("📞 Starting call to:", friend.name);
         setOtherUser(friend);
         setCallState("calling");
         showToast(`Calling ${friend.name}...`, "info");
@@ -203,17 +255,11 @@ const peerConnectionConfig = {
         const stream = await getLocalStream();
         const pc = initializePeerConnection(friend);
         stream.getTracks().forEach((track) => {
-          console.log(`  Adding track: ${track.kind}, enabled: ${track.enabled}`);
           pc.addTrack(track, stream);
         });
-        console.log(`✅ [startCall] Step 3 done in ${(performance.now() - trackStart).toFixed(2)}ms`);
 
         const offer = await pc.createOffer();
-        console.log(`✅ [startCall] Step 4a: Offer created in ${(performance.now() - offerStart).toFixed(2)}ms`);
-        
-        const setLocalStart = performance.now();
         await pc.setLocalDescription(offer);
-        console.log(`✅ [startCall] Step 4b: Local description set in ${(performance.now() - setLocalStart).toFixed(2)}ms`);
 
         sendWSMessage({
           type: "call-offer",
@@ -236,16 +282,17 @@ const peerConnectionConfig = {
     [user, getLocalStream, initializePeerConnection, sendWSMessage]
   );
 
-  // Answer call (callee side)
+  // ============================================
+  // ANSWER CALL
+  // ============================================
   const answerCall = useCallback(async () => {
-    const answerStartTime = performance.now();
     try {
       if (!pendingOfferRef.current) {
-        console.error("❌ [answerCall] No pending offer to answer");
+        console.error("No pending offer to answer");
         return;
       }
 
-      console.log("📞 [answerCall] Answering call...");
+      console.log("✅ Answering call");
       setCallState("active");
       showToast("Connecting...", "info");
 
@@ -255,13 +302,10 @@ const peerConnectionConfig = {
         id: offer.sender_id,
         name: otherUser?.name,
       });
-      console.log(`✅ [answerCall] Step 2 done in ${(performance.now() - pcStart).toFixed(2)}ms`);
 
       stream.getTracks().forEach((track) => {
-        console.log(`  Adding track: ${track.kind}, enabled: ${track.enabled}`);
         pc.addTrack(track, stream);
       });
-      console.log(`✅ [answerCall] Step 3 done in ${(performance.now() - trackStart).toFixed(2)}ms`);
 
       await pc.setRemoteDescription(
         new RTCSessionDescription({
@@ -269,20 +313,14 @@ const peerConnectionConfig = {
           sdp: offer.sdp_string,
         })
       );
-      console.log(`✅ [answerCall] Step 4 done in ${(performance.now() - remoteDescStart).toFixed(2)}ms`);
 
       while (iceCandidateQueueRef.current.length > 0) {
         const candidate = iceCandidateQueueRef.current.shift();
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
-      console.log(`✅ [answerCall] Step 5 done in ${(performance.now() - iceStart).toFixed(2)}ms`);
 
       const answer = await pc.createAnswer();
-      console.log(`✅ [answerCall] Step 6a: Answer created in ${(performance.now() - answerOfferStart).toFixed(2)}ms`);
-      
-      const setLocalStart = performance.now();
       await pc.setLocalDescription(answer);
-      console.log(`✅ [answerCall] Step 6b: Local description set in ${(performance.now() - setLocalStart).toFixed(2)}ms`);
 
       sendWSMessage({
         type: "call-answer",
@@ -295,19 +333,19 @@ const peerConnectionConfig = {
           time: new Date().toISOString(),
         },
       });
-      console.log(`✅ [answerCall] Step 7 done in ${(performance.now() - sendStart).toFixed(2)}ms`);
 
       pendingOfferRef.current = null;
-      const totalTime = (performance.now() - answerStartTime).toFixed(2);
-      console.log(`🎯 [answerCall] TOTAL TIME: ${totalTime}ms`);
+      console.log("✅ Call answer sent");
     } catch (error) {
       console.error("❌ Error answering call:", error);
       showToast("Failed to answer call", "error");
       endCall();
     }
-  }, [user, getLocalStream, initializePeerConnection, sendWSMessage]);
+  }, [user, getLocalStream, initializePeerConnection, sendWSMessage, otherUser]);
 
-  // Decline call
+  // ============================================
+  // DECLINE CALL
+  // ============================================
   const declineCall = useCallback(() => {
     console.log("❌ Call declined");
     showToast("Call declined", "info");
@@ -317,22 +355,32 @@ const peerConnectionConfig = {
     cleanup();
   }, []);
 
-  // End call
+  // ============================================
+  // END CALL
+  // ============================================
   const endCall = useCallback(() => {
     console.log("📴 Ending call");
     showToast("Call ended", "info");
     stopCallTimer();
+    releaseWakeLock();
     setCallState("idle");
     setOtherUser(null);
     pendingOfferRef.current = null;
     cleanup();
-  }, [stopCallTimer]);
+  }, [stopCallTimer, releaseWakeLock]);
 
-  // Cleanup resources
+  // ============================================
+  // CLEANUP
+  // ============================================
   const cleanup = useCallback(() => {
+    console.log("🧹 Cleaning up resources");
+    
     // Stop local stream
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        console.log("🛑 Stopped track:", track.kind);
+      });
       localStreamRef.current = null;
     }
 
@@ -340,6 +388,7 @@ const peerConnectionConfig = {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
+      console.log("🔌 Peer connection closed");
     }
 
     // Clear remote stream
@@ -354,13 +403,16 @@ const peerConnectionConfig = {
     setIsMuted(false);
   }, []);
 
-  // Toggle mute
+  // ============================================
+  // TOGGLE MUTE
+  // ============================================
   const toggleMute = useCallback(() => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
+        console.log("🎤 Mute toggled:", !audioTrack.enabled);
         showToast(
           audioTrack.enabled ? "Microphone on" : "Microphone muted",
           "info"
@@ -369,16 +421,15 @@ const peerConnectionConfig = {
     }
   }, []);
 
-  // Handle incoming offer
+  // ============================================
+  // HANDLE INCOMING OFFER
+  // ============================================
   const handleIncomingOffer = useCallback(
     async (payload) => {
-      const offerStart = performance.now();
-      console.log("📞 [handleIncomingOffer] Incoming call from:", payload.sender_id);
+      console.log("📞 Incoming call from:", payload.sender_id);
 
       let senderName = "Unknown User";
       try {
-        console.log("⏱️ [handleIncomingOffer] Fetching sender name from backend...");
-        const apiStart = performance.now();
         const response = await apiCall(
           `${
             process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
@@ -391,9 +442,8 @@ const peerConnectionConfig = {
             senderName = data.name;
           }
         }
-        console.log(`✅ [handleIncomingOffer] Sender name fetched in ${(performance.now() - apiStart).toFixed(2)}ms: ${senderName}`);
       } catch (error) {
-        console.error("❌ [handleIncomingOffer] Error fetching sender name:", error);
+        console.error("Error fetching sender name:", error);
       }
 
       const sender = {
@@ -409,27 +459,25 @@ const peerConnectionConfig = {
     [apiCall]
   );
 
-  // Handle incoming answer
+  // ============================================
+  // HANDLE INCOMING ANSWER
+  // ============================================
   const handleIncomingAnswer = useCallback(
     async (payload) => {
-      const handleStart = performance.now();
-      console.log("📥 [handleIncomingAnswer] Received call answer");
+      console.log("✅ Received call answer");
 
       if (!peerConnectionRef.current) {
-        console.error("❌ [handleIncomingAnswer] No peer connection to set answer");
+        console.error("No peer connection to set answer");
         return;
       }
 
       try {
-        console.log("⏱️ [handleIncomingAnswer] Setting remote description...");
-        const setRemoteStart = performance.now();
         await peerConnectionRef.current.setRemoteDescription(
           new RTCSessionDescription({
             type: "answer",
             sdp: payload.sdp_string,
           })
         );
-        console.log(`✅ [handleIncomingAnswer] Remote description set in ${(performance.now() - setRemoteStart).toFixed(2)}ms`);
 
         while (iceCandidateQueueRef.current.length > 0) {
           const candidate = iceCandidateQueueRef.current.shift();
@@ -437,10 +485,8 @@ const peerConnectionConfig = {
             new RTCIceCandidate(candidate)
           );
         }
-        console.log(`✅ [handleIncomingAnswer] ICE candidates processed in ${(performance.now() - iceStart).toFixed(2)}ms`);
 
-        const totalTime = (performance.now() - handleStart).toFixed(2);
-        console.log(`🎯 [handleIncomingAnswer] TOTAL TIME: ${totalTime}ms`);
+        console.log("✅ Answer processed successfully");
       } catch (error) {
         console.error("❌ Error processing answer:", error);
         showToast("Failed to establish connection", "error");
@@ -450,7 +496,9 @@ const peerConnectionConfig = {
     [endCall]
   );
 
-  // Handle incoming ICE candidate
+  // ============================================
+  // HANDLE INCOMING ICE CANDIDATE
+  // ============================================
   const handleIncomingIceCandidate = useCallback(async (payload) => {
     const candidate = {
       candidate: payload.candidate,
@@ -463,27 +511,43 @@ const peerConnectionConfig = {
       peerConnectionRef.current.remoteDescription
     ) {
       try {
-        console.log("⏱️ [handleIncomingIceCandidate] Adding ICE candidate to peer connection...");
         await peerConnectionRef.current.addIceCandidate(
           new RTCIceCandidate(candidate)
         );
-        const duration = (performance.now() - iceStart).toFixed(2);
-        console.log(`✅ [handleIncomingIceCandidate] ICE candidate added in ${duration}ms`);
+        console.log("🧊 ICE candidate added");
       } catch (error) {
         console.error("Error adding ICE candidate:", error);
       }
     } else {
       iceCandidateQueueRef.current.push(candidate);
+      console.log("🧊 ICE candidate queued");
     }
   }, []);
 
-  // Cleanup on unmount
+  // ============================================
+  // EFFECT: Setup visibility listener
+  // ============================================
+  useEffect(() => {
+    console.log("👀 Setting up visibility change listener");
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      console.log("👀 Removing visibility change listener");
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
+
+  // ============================================
+  // EFFECT: Cleanup on unmount
+  // ============================================
   useEffect(() => {
     return () => {
+      console.log("🧹 Component unmounting, cleaning up");
       cleanup();
       stopCallTimer();
+      releaseWakeLock();
     };
-  }, [cleanup, stopCallTimer]);
+  }, [cleanup, stopCallTimer, releaseWakeLock]);
 
   return {
     callState,
@@ -502,9 +566,10 @@ const peerConnectionConfig = {
   };
 }
 
-// Toast notification helper
+// ============================================
+// TOAST NOTIFICATION HELPER
+// ============================================
 function showToast(message, type = "info") {
-  // Create toast element
   const toast = document.createElement("div");
   toast.className = `fixed top-4 right-4 z-[9999] px-4 py-3 rounded-lg shadow-lg text-white font-medium animate-slideUp ${
     type === "error"
@@ -517,7 +582,6 @@ function showToast(message, type = "info") {
 
   document.body.appendChild(toast);
 
-  // Remove after 3 seconds
   setTimeout(() => {
     toast.classList.add("animate-slideDown");
     setTimeout(() => {
