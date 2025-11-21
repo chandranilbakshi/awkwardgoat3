@@ -3,6 +3,13 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
 
+// Debug: Log environment variables on module load
+console.log("🔧 [WebRTC] Environment Variables:");
+console.log("  NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+console.log("  NEXT_PUBLIC_WS_URL:", process.env.NEXT_PUBLIC_WS_URL);
+console.log("  NEXT_PUBLIC_TURN_USERNAME:", process.env.NEXT_PUBLIC_TURN_USERNAME);
+console.log("  NEXT_PUBLIC_TURN_CREDENTIALS:", process.env.NEXT_PUBLIC_TURN_CREDENTIALS);
+
 export function useWebRTC(sendWSMessage) {
   const { user } = useAuth();
   const { apiCall } = useApi();
@@ -23,25 +30,41 @@ export function useWebRTC(sendWSMessage) {
   const callStartTimeRef = useRef(null);
   const durationIntervalRef = useRef(null);
 
-  // WebRTC configuration with Google's STUN server
-  const peerConnectionConfig = {
-      iceServers: [
-    // Keep Google's stun for fallback
+const peerConnectionConfig = {
+  iceServers: [
+    // 1. STUN for direct P2P (fastest possible)
     { urls: "stun:stun.l.google.com:19302" },
 
+    // // Try UDP first
+    // {
+    //   urls: "turns:zibro.live:443?transport=udp",
+    //   username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+    //   credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+    // },
+
+    // Fallback: TURN over TLS
     {
-      urls: [
-        "stun:zibro.live:3478",
-        "turn:zibro.live:3478?transport=udp",
-        "turn:zibro.live:3478?transport=tcp",
-        "turns:zibro.live:5349?transport=tcp",
-      ],
+      urls: "turns:zibro.live:443?transport=tcp",
       username: process.env.NEXT_PUBLIC_TURN_USERNAME,
       credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
     },
-  ]
-,
-  };
+
+    // First: TURN over TCP (port 3478)
+    {
+      urls: "turn:zibro.live:3478?transport=tcp",
+      username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+    },
+
+  ],
+
+  // Force TURN usage only (no STUN or direct)
+  // iceTransportPolicy: "relay"
+};
+
+
+// Debug: Log peer connection config
+console.log("🔧 [WebRTC] Peer Connection Config:", JSON.stringify(peerConnectionConfig, null, 2));
 
   // Start call duration timer
   const startCallTimer = useCallback(() => {
@@ -75,8 +98,13 @@ export function useWebRTC(sendWSMessage) {
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log('🧊 ICE Candidate:', event.candidate.candidate);
+          console.log('🧊 ICE Candidate Type:', event.candidate.type);
+          console.log('🧊 ICE Candidate Protocol:', event.candidate.protocol);
+        }
         if (event.candidate && targetUser) {
-          console.log("📡 Sending ICE candidate");
+          console.log("📡 Sending ICE candidate to:", targetUser.id);
           sendWSMessage({
             type: "ice-candidate",
             payload: {
@@ -93,13 +121,15 @@ export function useWebRTC(sendWSMessage) {
       // Handle remote track
       pc.ontrack = (event) => {
         console.log("🎵 Received remote audio track");
+        console.log("🎵 Remote stream ID:", event.streams[0]?.id);
+        console.log("🎵 Track kind:", event.track.kind);
         remoteStreamRef.current = event.streams[0];
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = event.streams[0];
         }
       };
 
-      // Handle connection state changes
+      // Handle ICE connection state changes
       pc.oniceconnectionstatechange = () => {
         console.log("🔌 ICE Connection State:", pc.iceConnectionState);
 
@@ -119,6 +149,21 @@ export function useWebRTC(sendWSMessage) {
         }
       };
 
+      // Handle connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log("🔗 Connection State:", pc.connectionState);
+      };
+
+      // Handle ICE gathering state changes
+      pc.onicegatheringstatechange = () => {
+        console.log("🌐 ICE Gathering State:", pc.iceGatheringState);
+      };
+
+      // Handle signaling state changes
+      pc.onsignalingstatechange = () => {
+        console.log("📶 Signaling State:", pc.signalingState);
+      };
+
       peerConnectionRef.current = pc;
       return pc;
     },
@@ -127,11 +172,15 @@ export function useWebRTC(sendWSMessage) {
 
   // Get microphone access
   const getLocalStream = useCallback(async () => {
+    console.log("⏱️ [getLocalStream] Starting microphone access...");
+    const startTime = performance.now();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
       });
+      const duration = (performance.now() - startTime).toFixed(2);
+      console.log(`✅ [getLocalStream] Microphone access granted in ${duration}ms`);
       localStreamRef.current = stream;
       return stream;
     } catch (error) {
@@ -153,28 +202,47 @@ export function useWebRTC(sendWSMessage) {
   // Start call (caller side)
   const startCall = useCallback(
     async (friend) => {
+      const callStartTime = performance.now();
       try {
-        console.log("📞 Starting call to:", friend.name);
+        console.log("📞 [startCall] Starting call to:", friend.name);
         setOtherUser(friend);
         setCallState("calling");
         showToast(`Calling ${friend.name}...`, "info");
 
         // Get microphone access
+        console.log("⏱️ [startCall] Step 1: Getting microphone access...");
+        const streamStart = performance.now();
         const stream = await getLocalStream();
+        console.log(`✅ [startCall] Step 1 done in ${(performance.now() - streamStart).toFixed(2)}ms`);
 
         // Initialize peer connection
-        const pc = initializePeerConnection();
+        console.log("⏱️ [startCall] Step 2: Initializing peer connection...");
+        const pcStart = performance.now();
+        const pc = initializePeerConnection(friend);
+        console.log(`✅ [startCall] Step 2 done in ${(performance.now() - pcStart).toFixed(2)}ms`);
 
         // Add audio tracks
+        console.log("⏱️ [startCall] Step 3: Adding audio tracks...");
+        const trackStart = performance.now();
         stream.getTracks().forEach((track) => {
+          console.log(`  Adding track: ${track.kind}, enabled: ${track.enabled}`);
           pc.addTrack(track, stream);
         });
+        console.log(`✅ [startCall] Step 3 done in ${(performance.now() - trackStart).toFixed(2)}ms`);
 
         // Create offer
+        console.log("⏱️ [startCall] Step 4: Creating SDP offer...");
+        const offerStart = performance.now();
         const offer = await pc.createOffer();
+        console.log(`✅ [startCall] Step 4a: Offer created in ${(performance.now() - offerStart).toFixed(2)}ms`);
+        
+        const setLocalStart = performance.now();
         await pc.setLocalDescription(offer);
+        console.log(`✅ [startCall] Step 4b: Local description set in ${(performance.now() - setLocalStart).toFixed(2)}ms`);
 
         // Send offer to backend
+        console.log("⏱️ [startCall] Step 5: Sending offer via WebSocket...");
+        const sendStart = performance.now();
         sendWSMessage({
           type: "call-offer",
           payload: {
@@ -186,8 +254,10 @@ export function useWebRTC(sendWSMessage) {
             time: new Date().toISOString(),
           },
         });
+        console.log(`✅ [startCall] Step 5 done in ${(performance.now() - sendStart).toFixed(2)}ms`);
 
-        console.log("✅ Call offer sent");
+        const totalTime = (performance.now() - callStartTime).toFixed(2);
+        console.log(`🎯 [startCall] TOTAL TIME: ${totalTime}ms`);
       } catch (error) {
         console.error("❌ Error starting call:", error);
         setCallState("idle");
@@ -199,51 +269,76 @@ export function useWebRTC(sendWSMessage) {
 
   // Answer call (callee side)
   const answerCall = useCallback(async () => {
+    const answerStartTime = performance.now();
     try {
       if (!pendingOfferRef.current) {
-        console.error("No pending offer to answer");
+        console.error("❌ [answerCall] No pending offer to answer");
         return;
       }
 
-      console.log("✅ Answering call");
+      console.log("📞 [answerCall] Answering call...");
       setCallState("active");
       showToast("Connecting...", "info");
 
       const offer = pendingOfferRef.current;
 
       // Get microphone access
+      console.log("⏱️ [answerCall] Step 1: Getting microphone access...");
+      const streamStart = performance.now();
       const stream = await getLocalStream();
+      console.log(`✅ [answerCall] Step 1 done in ${(performance.now() - streamStart).toFixed(2)}ms`);
 
       // Initialize peer connection
+      console.log("⏱️ [answerCall] Step 2: Initializing peer connection...");
+      const pcStart = performance.now();
       const pc = initializePeerConnection({
         id: offer.sender_id,
         name: otherUser?.name,
       });
+      console.log(`✅ [answerCall] Step 2 done in ${(performance.now() - pcStart).toFixed(2)}ms`);
 
       // Add audio tracks
+      console.log("⏱️ [answerCall] Step 3: Adding audio tracks...");
+      const trackStart = performance.now();
       stream.getTracks().forEach((track) => {
+        console.log(`  Adding track: ${track.kind}, enabled: ${track.enabled}`);
         pc.addTrack(track, stream);
       });
+      console.log(`✅ [answerCall] Step 3 done in ${(performance.now() - trackStart).toFixed(2)}ms`);
 
       // Set remote description (the offer)
+      console.log("⏱️ [answerCall] Step 4: Setting remote description...");
+      const remoteDescStart = performance.now();
       await pc.setRemoteDescription(
         new RTCSessionDescription({
           type: "offer",
           sdp: offer.sdp_string,
         })
       );
+      console.log(`✅ [answerCall] Step 4 done in ${(performance.now() - remoteDescStart).toFixed(2)}ms`);
 
       // Process queued ICE candidates
+      console.log("⏱️ [answerCall] Step 5: Processing ${iceCandidateQueueRef.current.length} queued ICE candidates...");
+      const iceStart = performance.now();
       while (iceCandidateQueueRef.current.length > 0) {
         const candidate = iceCandidateQueueRef.current.shift();
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
+      console.log(`✅ [answerCall] Step 5 done in ${(performance.now() - iceStart).toFixed(2)}ms`);
 
       // Create answer
+      console.log("⏱️ [answerCall] Step 6: Creating SDP answer...");
+      const answerOfferStart = performance.now();
       const answer = await pc.createAnswer();
+      console.log(`✅ [answerCall] Step 6a: Answer created in ${(performance.now() - answerOfferStart).toFixed(2)}ms`);
+      
+      const setLocalStart = performance.now();
       await pc.setLocalDescription(answer);
+      console.log(`✅ [answerCall] Step 6b: Local description set in ${(performance.now() - setLocalStart).toFixed(2)}ms`);
 
       // Send answer to backend
+      console.log("⏱️ [answerCall] Step 7: Sending answer via WebSocket...");
+      const sendStart = performance.now();
       sendWSMessage({
         type: "call-answer",
         payload: {
@@ -255,9 +350,11 @@ export function useWebRTC(sendWSMessage) {
           time: new Date().toISOString(),
         },
       });
+      console.log(`✅ [answerCall] Step 7 done in ${(performance.now() - sendStart).toFixed(2)}ms`);
 
       pendingOfferRef.current = null;
-      console.log("✅ Call answer sent");
+      const totalTime = (performance.now() - answerStartTime).toFixed(2);
+      console.log(`🎯 [answerCall] TOTAL TIME: ${totalTime}ms`);
     } catch (error) {
       console.error("❌ Error answering call:", error);
       showToast("Failed to answer call", "error");
@@ -330,11 +427,14 @@ export function useWebRTC(sendWSMessage) {
   // Handle incoming offer
   const handleIncomingOffer = useCallback(
     async (payload) => {
-      console.log("📞 Incoming call from:", payload.sender_id);
+      const offerStart = performance.now();
+      console.log("📞 [handleIncomingOffer] Incoming call from:", payload.sender_id);
 
       // Fetch sender's name from backend
       let senderName = "Unknown User";
       try {
+        console.log("⏱️ [handleIncomingOffer] Fetching sender name from backend...");
+        const apiStart = performance.now();
         const response = await apiCall(
           `${
             process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
@@ -347,8 +447,9 @@ export function useWebRTC(sendWSMessage) {
             senderName = data.name;
           }
         }
+        console.log(`✅ [handleIncomingOffer] Sender name fetched in ${(performance.now() - apiStart).toFixed(2)}ms: ${senderName}`);
       } catch (error) {
-        console.error("Error fetching sender name:", error);
+        console.error("❌ [handleIncomingOffer] Error fetching sender name:", error);
       }
 
       const sender = {
@@ -367,30 +468,39 @@ export function useWebRTC(sendWSMessage) {
   // Handle incoming answer
   const handleIncomingAnswer = useCallback(
     async (payload) => {
-      console.log("✅ Received call answer");
+      const handleStart = performance.now();
+      console.log("📥 [handleIncomingAnswer] Received call answer");
 
       if (!peerConnectionRef.current) {
-        console.error("No peer connection to set answer");
+        console.error("❌ [handleIncomingAnswer] No peer connection to set answer");
         return;
       }
 
       try {
+        console.log("⏱️ [handleIncomingAnswer] Setting remote description...");
+        const setRemoteStart = performance.now();
         await peerConnectionRef.current.setRemoteDescription(
           new RTCSessionDescription({
             type: "answer",
             sdp: payload.sdp_string,
           })
         );
+        console.log(`✅ [handleIncomingAnswer] Remote description set in ${(performance.now() - setRemoteStart).toFixed(2)}ms`);
 
         // Process queued ICE candidates
+        const queuedCount = iceCandidateQueueRef.current.length;
+        console.log(`⏱️ [handleIncomingAnswer] Processing ${queuedCount} queued ICE candidates...`);
+        const iceStart = performance.now();
         while (iceCandidateQueueRef.current.length > 0) {
           const candidate = iceCandidateQueueRef.current.shift();
           await peerConnectionRef.current.addIceCandidate(
             new RTCIceCandidate(candidate)
           );
         }
+        console.log(`✅ [handleIncomingAnswer] ICE candidates processed in ${(performance.now() - iceStart).toFixed(2)}ms`);
 
-        console.log("✅ Answer processed successfully");
+        const totalTime = (performance.now() - handleStart).toFixed(2);
+        console.log(`🎯 [handleIncomingAnswer] TOTAL TIME: ${totalTime}ms`);
       } catch (error) {
         console.error("❌ Error processing answer:", error);
         showToast("Failed to establish connection", "error");
@@ -402,7 +512,9 @@ export function useWebRTC(sendWSMessage) {
 
   // Handle incoming ICE candidate
   const handleIncomingIceCandidate = useCallback(async (payload) => {
-    console.log("📡 Received ICE candidate");
+    const iceStart = performance.now();
+    console.log("📡 [handleIncomingIceCandidate] Received ICE candidate");
+    console.log(`  Candidate: ${payload.candidate}`);
 
     const candidate = {
       candidate: payload.candidate,
@@ -415,14 +527,18 @@ export function useWebRTC(sendWSMessage) {
       peerConnectionRef.current.remoteDescription
     ) {
       try {
+        console.log("⏱️ [handleIncomingIceCandidate] Adding ICE candidate to peer connection...");
         await peerConnectionRef.current.addIceCandidate(
           new RTCIceCandidate(candidate)
         );
+        const duration = (performance.now() - iceStart).toFixed(2);
+        console.log(`✅ [handleIncomingIceCandidate] ICE candidate added in ${duration}ms`);
       } catch (error) {
-        console.error("❌ Error adding ICE candidate:", error);
+        console.error("❌ [handleIncomingIceCandidate] Error adding ICE candidate:", error);
       }
     } else {
       // Queue candidate if remote description not set yet
+      console.log(`⚠️ [handleIncomingIceCandidate] Queuing candidate (no remote description yet). Queue size: ${iceCandidateQueueRef.current.length + 1}`);
       iceCandidateQueueRef.current.push(candidate);
     }
   }, []);
