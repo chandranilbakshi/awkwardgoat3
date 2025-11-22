@@ -10,11 +10,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Check if user is logged in on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   const checkAuth = async () => {
     try {
       const accessToken = localStorage.getItem("access_token");
@@ -79,6 +74,12 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
   };
+
+  // Check if user is logged in on mount
+  useEffect(() => {
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = (accessToken, refreshToken, userData) => {
     localStorage.setItem("access_token", accessToken);

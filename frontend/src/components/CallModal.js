@@ -13,13 +13,13 @@ export default function CallModal({
   onToggleMute,
   remoteAudioRef,
 }) {
-  if (callState === "idle") return null;
-
   const formattedDuration = useMemo(() => {
     const mins = Math.floor(callDuration / 60);
     const secs = callDuration % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }, [callDuration]);
+
+  if (callState === "idle") return null;
 
   return (
     <>

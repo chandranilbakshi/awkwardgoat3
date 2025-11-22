@@ -238,8 +238,8 @@ useEffect(() => {
   }
   
   prevMessageCountRef.current = processedMessages.length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [processedMessages.length, isMobile]);
-// ✅ Remove virtualizers from deps
 
   if (!selectedFriend) {
     return (

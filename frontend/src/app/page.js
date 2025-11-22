@@ -185,12 +185,10 @@ export default function ChatPage() {
     });
 
     return removeHandler;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     user,
     addMessageHandler,
-    handleIncomingOffer,
-    handleIncomingAnswer,
-    handleIncomingIceCandidate,
   ]);
 
   // ESC key handler

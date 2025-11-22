@@ -25,13 +25,13 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           {children}
           <Toaster 
-            position="top-right"
+            position="top-center"
             toastOptions={{
               duration: 3000,
               style: {
-                background: '#252526',
-                color: '#d4d4d4',
-                border: '1px solid #3e3e42',
+                background: '#d4d4d4',
+                color: '#252526',
+                border: '1px solid #252526',
                 borderRadius: '12px',
                 fontSize: '14px',
                 fontWeight: '500',
