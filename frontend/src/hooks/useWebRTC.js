@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
+import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/useApi";
 
@@ -47,7 +48,7 @@ export function useWebRTC(sendWSMessage) {
     // Check if Wake Lock API is supported
     if (!("wakeLock" in navigator)) {
       console.log("⚠️ Wake Lock API not supported on this browser");
-      showToast("Wake Lock not supported. Screen may turn off during call.", "info");
+      toast("Wake Lock not supported. Screen may turn off during call.");
       return;
     }
 
@@ -58,7 +59,7 @@ export function useWebRTC(sendWSMessage) {
       wakeLockRef.current = await navigator.wakeLock.request("screen");
       
       console.log("✅ Wake Lock acquired! Screen will stay on during call.");
-      showToast("Screen will stay on during call", "success");
+      toast.success("Screen will stay on during call");
 
       // Listen for wake lock release (happens when screen is manually locked or tab changes)
       wakeLockRef.current.addEventListener("release", () => {
@@ -69,9 +70,9 @@ export function useWebRTC(sendWSMessage) {
       console.error("❌ Failed to acquire Wake Lock:", error);
       
       if (error.name === "NotAllowedError") {
-        showToast("Unable to keep screen on. Please keep app active.", "error");
+        toast.error("Unable to keep screen on. Please keep app active.");
       } else {
-        showToast("Screen may turn off during call", "info");
+        toast("Screen may turn off during call");
       }
     }
   }, []);
@@ -173,14 +174,14 @@ export function useWebRTC(sendWSMessage) {
           // Request Wake Lock when call is connected
           requestWakeLock();
           
-          showToast("Call connected!", "success");
+          toast.success("Call connected!");
         } else if (pc.iceConnectionState === "failed") {
           console.error("❌ ICE connection failed");
-          showToast("Connection failed. Please try again.", "error");
+          toast.error("Connection failed. Please try again.");
           endCall();
         } else if (pc.iceConnectionState === "disconnected") {
           console.log("⚠️ ICE connection disconnected");
-          showToast("Call disconnected", "info");
+          toast("Call disconnected");
           endCall();
         }
       };
@@ -228,14 +229,13 @@ export function useWebRTC(sendWSMessage) {
     } catch (error) {
       console.error("❌ Microphone access error:", error);
       if (error.name === "NotAllowedError") {
-        showToast(
-          "Microphone access denied. Please allow microphone access in your browser settings.",
-          "error"
+        toast.error(
+          "Microphone access denied. Please allow microphone access in your browser settings."
         );
       } else if (error.name === "NotFoundError") {
-        showToast("No microphone found. Please connect a microphone.", "error");
+        toast.error("No microphone found. Please connect a microphone.");
       } else {
-        showToast("Failed to access microphone. Please try again.", "error");
+        toast.error("Failed to access microphone. Please try again.");
       }
       throw error;
     }
@@ -250,7 +250,7 @@ export function useWebRTC(sendWSMessage) {
         console.log("📞 Starting call to:", friend.name);
         setOtherUser(friend);
         setCallState("calling");
-        showToast(`Calling ${friend.name}...`, "info");
+        toast(`Calling ${friend.name}...`);
 
         const stream = await getLocalStream();
         const pc = initializePeerConnection(friend);
@@ -294,7 +294,7 @@ export function useWebRTC(sendWSMessage) {
 
       console.log("✅ Answering call");
       setCallState("active");
-      showToast("Connecting...", "info");
+      toast("Connecting...");
 
       const offer = pendingOfferRef.current;
       const stream = await getLocalStream();
@@ -338,7 +338,7 @@ export function useWebRTC(sendWSMessage) {
       console.log("✅ Call answer sent");
     } catch (error) {
       console.error("❌ Error answering call:", error);
-      showToast("Failed to answer call", "error");
+      toast.error("Failed to answer call");
       endCall();
     }
   }, [user, getLocalStream, initializePeerConnection, sendWSMessage, otherUser]);
@@ -348,7 +348,7 @@ export function useWebRTC(sendWSMessage) {
   // ============================================
   const declineCall = useCallback(() => {
     console.log("❌ Call declined");
-    showToast("Call declined", "info");
+    toast("Call declined");
     pendingOfferRef.current = null;
     setCallState("idle");
     setOtherUser(null);
@@ -360,7 +360,7 @@ export function useWebRTC(sendWSMessage) {
   // ============================================
   const endCall = useCallback(() => {
     console.log("📴 Ending call");
-    showToast("Call ended", "info");
+    toast("Call ended");
     stopCallTimer();
     releaseWakeLock();
     setCallState("idle");
@@ -413,10 +413,7 @@ export function useWebRTC(sendWSMessage) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMuted(!audioTrack.enabled);
         console.log("🎤 Mute toggled:", !audioTrack.enabled);
-        showToast(
-          audioTrack.enabled ? "Microphone on" : "Microphone muted",
-          "info"
-        );
+        toast(audioTrack.enabled ? "Microphone on" : "Microphone muted");
       }
     }
   }, []);
@@ -454,7 +451,9 @@ export function useWebRTC(sendWSMessage) {
       pendingOfferRef.current = payload;
       setOtherUser(sender);
       setCallState("ringing");
-      showToast(`Incoming call from ${senderName}...`, "info");
+      toast(`Incoming call from ${senderName}...`, { 
+        duration: 30000, // Show for 30 seconds for incoming call
+      });
     },
     [apiCall]
   );
@@ -489,7 +488,7 @@ export function useWebRTC(sendWSMessage) {
         console.log("✅ Answer processed successfully");
       } catch (error) {
         console.error("❌ Error processing answer:", error);
-        showToast("Failed to establish connection", "error");
+        toast.error("Failed to establish connection");
         endCall();
       }
     },
@@ -564,28 +563,4 @@ export function useWebRTC(sendWSMessage) {
     handleIncomingAnswer,
     handleIncomingIceCandidate,
   };
-}
-
-// ============================================
-// TOAST NOTIFICATION HELPER
-// ============================================
-function showToast(message, type = "info") {
-  const toast = document.createElement("div");
-  toast.className = `fixed top-4 right-4 z-[9999] px-4 py-3 rounded-lg shadow-lg text-white font-medium animate-slideUp ${
-    type === "error"
-      ? "bg-red-600"
-      : type === "success"
-      ? "bg-green-600"
-      : "bg-blue-600"
-  }`;
-  toast.textContent = message;
-
-  document.body.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add("animate-slideDown");
-    setTimeout(() => {
-      document.body.removeChild(toast);
-    }, 250);
-  }, 3000);
 }

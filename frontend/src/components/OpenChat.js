@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, Fragment } from "react";
+import { useState, useRef, useEffect, Fragment, useCallback, useMemo } from "react";
 import {
   Phone,
   Video,
@@ -83,16 +83,8 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textAreaRef.current) {
-      textAreaRef.current.style.height = "auto";
-      textAreaRef.current.style.height =
-        Math.min(textAreaRef.current.scrollHeight, 120) + "px";
-    }
-  }, [message]);
-
-  const handleSendMessage = () => {
+  // Memoize handlers to prevent recreation on every render
+  const handleSendMessage = useCallback(() => {
     if (!message.trim() || !selectedFriend || !user) return;
 
     // Sort user IDs to ensure consistency
@@ -130,24 +122,41 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
       addMessage(newMessage);
       setMessage("");
     }
-  };
+  }, [message, selectedFriend, user, sendWSMessage, addMessage]);
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const formatTime = (timestamp) => {
+  // Auto-resize textarea - using requestAnimationFrame to batch DOM updates
+  useEffect(() => {
+    const resizeTextarea = () => {
+      if (textAreaRef.current) {
+        textAreaRef.current.style.height = "auto";
+        textAreaRef.current.style.height =
+          Math.min(textAreaRef.current.scrollHeight, 120) + "px";
+      }
+    };
+
+    // Use requestAnimationFrame to batch DOM updates and improve performance
+    const rafId = requestAnimationFrame(resizeTextarea);
+    
+    return () => cancelAnimationFrame(rafId);
+  }, [message]);
+
+  // Memoize formatting functions to prevent recreation on every render
+  const formatTime = useCallback((timestamp) => {
     return new Intl.DateTimeFormat("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
     }).format(timestamp);
-  };
+  }, []);
 
-  const formatDate = (timestamp) => {
+  const formatDate = useCallback((timestamp) => {
     const today = new Date();
     const messageDate = new Date(timestamp);
 
@@ -163,14 +172,37 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
     }
 
     return messageDate.toLocaleDateString();
-  };
+  }, []);
 
-  // Handle call button click
-  const handleCallClick = () => {
+  // Memoize processed messages to avoid recalculating formatting on every render
+  const processedMessages = useMemo(() => {
+    return messages.map((msg, index) => {
+      const formattedDate = formatDate(msg.timestamp);
+      const formattedTime = formatTime(msg.timestamp);
+      
+      const showDate =
+        index === 0 ||
+        formatDate(messages[index - 1].timestamp) !== formattedDate;
+
+      const prevMsg = index > 0 ? messages[index - 1] : null;
+      const isSameSender = prevMsg && prevMsg.sender === msg.sender && !showDate;
+
+      return {
+        ...msg,
+        formattedDate,
+        formattedTime,
+        showDate,
+        isSameSender,
+      };
+    });
+  }, [messages, formatDate, formatTime]);
+
+  // Handle call button click - memoized to prevent recreation
+  const handleCallClick = useCallback(() => {
     if (selectedFriend && onStartCall) {
       onStartCall(selectedFriend);
     }
-  };
+  }, [selectedFriend, onStartCall]);
 
   if (!selectedFriend) {
     return (
@@ -226,49 +258,39 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
               </div>
             </div>
           ) : (
-            messages.map((msg, index) => {
-              const showDate =
-                index === 0 ||
-                formatDate(messages[index - 1].timestamp) !==
-                  formatDate(msg.timestamp);
-
-              const prevMsg = index > 0 ? messages[index - 1] : null;
-              const isSameSender = prevMsg && prevMsg.sender === msg.sender && !showDate;
-
-              return (
-                <Fragment key={`${msg.id}-${index}`}>
-                  {showDate && (
-                    <div className="flex justify-center my-3">
-                      <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
-                        {formatDate(msg.timestamp)}
-                      </span>
-                    </div>
-                  )}
+            processedMessages.map((msg, index) => (
+              <Fragment key={`${msg.id}-${index}`}>
+                {msg.showDate && (
+                  <div className="flex justify-center my-3">
+                    <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
+                      {msg.formattedDate}
+                    </span>
+                  </div>
+                )}
+                <div
+                  className={`flex ${
+                    msg.isOwn ? 'justify-end' : 'justify-start'
+                  } ${msg.isSameSender ? 'mt-1' : 'mt-3'}`}
+                >
                   <div
-                    className={`flex ${
-                      msg.isOwn ? 'justify-end' : 'justify-start'
-                    } ${isSameSender ? 'mt-1' : 'mt-3'}`}
-                  >
-                    <div
-                    className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
-                      msg.isOwn
-                        ? `bg-gray-600 text-white ${isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
-                        : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
+                  className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
+                    msg.isOwn
+                      ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
+                      : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
+                  }`}
+                >
+                    <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
+                  <p
+                    className={`flex items-end text-xs mt-1 ${
+                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
                     }`}
                   >
-                      <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
-                    <p
-                      className={`flex items-end text-xs mt-1 ${
-                        msg.isOwn ? "text-gray-100" : "text-[#858585]"
-                      }`}
-                    >
-                      {formatTime(msg.timestamp)}
-                    </p>
-                    </div>
+                    {msg.formattedTime}
+                  </p>
                   </div>
-                </Fragment>
-              );
-            })
+                </div>
+              </Fragment>
+            ))
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -433,49 +455,39 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
           </div>
         </div>
       ) : (
-        messages.map((msg, index) => {
-          const showDate =
-            index === 0 ||
-            formatDate(messages[index - 1].timestamp) !==
-              formatDate(msg.timestamp);
-
-          const prevMsg = index > 0 ? messages[index - 1] : null;
-          const isSameSender = prevMsg && prevMsg.sender === msg.sender && !showDate;
-
-          return (
-            <Fragment key={`${msg.id}-${index}`}>
-              {showDate && (
-                <div className="flex justify-center my-3">
-                  <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
-                    {formatDate(msg.timestamp)}
-                  </span>
-                </div>
-              )}
-              <div
-                className={`flex ${
-                  msg.isOwn ? 'justify-end' : 'justify-start'
-                } ${isSameSender ? 'mt-1' : 'mt-4'}`}
-              >
-                <div
-                  className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
-                      msg.isOwn
-                        ? `bg-gray-600 text-white ${isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
-                        : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
-                    }`}
-                >
-                  <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
-                  <p
-                      className={`flex items-end text-xs mt-1 ${
-                        msg.isOwn ? "text-gray-100" : "text-[#858585]"
-                      }`}
-                    >
-                      {formatTime(msg.timestamp)}
-                    </p>
-                </div>
+        processedMessages.map((msg, index) => (
+          <Fragment key={`${msg.id}-${index}`}>
+            {msg.showDate && (
+              <div className="flex justify-center my-3">
+                <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
+                  {msg.formattedDate}
+                </span>
               </div>
-            </Fragment>
-          );
-        })
+            )}
+            <div
+              className={`flex ${
+                msg.isOwn ? 'justify-end' : 'justify-start'
+              } ${msg.isSameSender ? 'mt-1' : 'mt-4'}`}
+            >
+              <div
+                className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
+                    msg.isOwn
+                      ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
+                      : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
+                  }`}
+              >
+                <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
+                <p
+                    className={`flex items-end text-xs mt-1 ${
+                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
+                    }`}
+                  >
+                    {msg.formattedTime}
+                  </p>
+              </div>
+            </div>
+          </Fragment>
+        ))
       )}
       <div ref={messagesEndRef} />
     </div>

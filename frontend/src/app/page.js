@@ -1,12 +1,23 @@
 "use client";
-import AddFriendModal from "@/components/AddFriendModal";
-import OpenChat from "@/components/OpenChat";
+import dynamic from 'next/dynamic';
+
+const AddFriendModal = dynamic(() => import('@/components/AddFriendModal'), {
+  ssr: false,
+});
+
+const CallModal = dynamic(() => import('@/components/CallModal'), {
+  ssr: false,
+});
+
+const OpenChat = dynamic(() => import('@/components/OpenChat'), {
+  ssr: false,
+});
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
 import { Ellipsis, Plus } from "lucide-react";
-import CallModal from "@/components/CallModal";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 
@@ -92,12 +103,15 @@ export default function ChatPage() {
   }, [user, apiCall]);
 
   // Handle call initiation from OpenChat
-  const handleStartCall = useCallback((friend) => {
-    startCall({
-      id: friend.fid,
-      name: friend.name,
-    });
-  }, [startCall]);
+  const handleStartCall = useCallback(
+    (friend) => {
+      startCall({
+        id: friend.fid,
+        name: friend.name,
+      });
+    },
+    [startCall]
+  );
 
   // Redirect to signup if not authenticated
   useEffect(() => {
@@ -171,7 +185,13 @@ export default function ChatPage() {
     });
 
     return removeHandler;
-  }, [user, addMessageHandler, handleIncomingOffer, handleIncomingAnswer, handleIncomingIceCandidate]);
+  }, [
+    user,
+    addMessageHandler,
+    handleIncomingOffer,
+    handleIncomingAnswer,
+    handleIncomingIceCandidate,
+  ]);
 
   // ESC key handler
   useEffect(() => {
@@ -189,26 +209,27 @@ export default function ChatPage() {
   }, [isModalOpen]);
 
   // Resize handler
-  useEffect(() => {
-    const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback(
+    (e) => {
       if (!isResizing || !containerRef.current) return;
 
       const containerRect = containerRef.current.getBoundingClientRect();
       const newWidth = e.clientX - containerRect.left;
-
-      // Set min and max widths (e.g., 250px to 600px)
       const minWidth = 250;
       const maxWidth = 600;
 
       if (newWidth >= minWidth && newWidth <= maxWidth) {
         setLeftPanelWidth(newWidth);
       }
-    };
+    },
+    [isResizing]
+  );
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
 
+  useEffect(() => {
     if (isResizing) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
@@ -222,7 +243,7 @@ export default function ChatPage() {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing]);
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   // Don't render anything while loading or if not authenticated
   if (loading || !user) {
@@ -321,20 +342,19 @@ export default function ChatPage() {
         ref={containerRef}
         className="md:flex w-full relative h-full overflow-hidden"
       >
-
         <div className="flex flex-col h-full gap-1">
-        {/* Global Call Modal */}
-        <CallModal
-          callState={callState}
-          otherUser={otherUser}
-          isMuted={isMuted}
-          callDuration={callDuration}
-          onAnswer={answerCall}
-          onDecline={declineCall}
-          onEndCall={endCall}
-          onToggleMute={toggleMute}
-          remoteAudioRef={remoteAudioRef}
-        />
+          {/* Global Call Modal */}
+          <CallModal
+            callState={callState}
+            otherUser={otherUser}
+            isMuted={isMuted}
+            callDuration={callDuration}
+            onAnswer={answerCall}
+            onDecline={declineCall}
+            onEndCall={endCall}
+            onToggleMute={toggleMute}
+            remoteAudioRef={remoteAudioRef}
+          />
           {/* Chat List Box */}
           <div
             className={`bg-[#252526] border border-[#3e3e42] md:rounded-2xl p-4 flex flex-col h-full transition-transform duration-300 ${

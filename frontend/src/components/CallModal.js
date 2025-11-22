@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
 
 export default function CallModal({
@@ -14,13 +15,11 @@ export default function CallModal({
 }) {
   if (callState === "idle") return null;
 
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  const formattedDuration = useMemo(() => {
+    const mins = Math.floor(callDuration / 60);
+    const secs = callDuration % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }, [callDuration]);
 
   return (
     <>
@@ -38,7 +37,7 @@ export default function CallModal({
               )}
               {callState === "active" && (
                 <p className="text-green-400 font-mono text-sm">
-                  {formatDuration(callDuration)}
+                  {formattedDuration}
                 </p>
               )}
 

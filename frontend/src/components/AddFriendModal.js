@@ -1,7 +1,60 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { X, Copy, Check, Clipboard, SendHorizonal, ChevronLeft } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
+
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-900/30 text-yellow-400 border border-yellow-700/50";
+    case "accepted":
+      return "bg-green-900/30 text-green-400 border border-green-700/50";
+    default:
+      return "bg-red-900/30 text-red-400 border border-red-700/50";
+  }
+};
+
+// Memoized Request Item component to prevent unnecessary re-renders
+const RequestItem = memo(({ request, activeTab, onManageRequest }) => {
+  const badgeClass = getStatusBadgeClass(request.status);
+  
+  return (
+    <div className="p-3 bg-[#2a2d2e] border border-[#3e3e42] rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-[#d4d4d4]">
+            {request.user_name}
+          </div>
+        </div>
+        
+        {/* Status Badge */}
+        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${badgeClass}`}>
+          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+        </span>
+      </div>
+
+      {/* Action Buttons - Only show for pending received requests */}
+      {activeTab === "received" && request.status === "pending" && (
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={() => onManageRequest(request.id, "accepted")}
+            className="flex-1 px-3 py-1.5 bg-gray-600 text-white text-xs font-semibold rounded hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
+          >
+            <Check size={15} /> Accept
+          </button>
+          <button
+            onClick={() => onManageRequest(request.id, "rejected")}
+            className="flex-1 px-3 py-1.5 border border-[#3e3e42] text-gray-100 text-xs font-semibold rounded hover:bg-[#3e3e42] transition-colors flex items-center justify-center gap-1"
+          >
+            <X size={15} /> Reject
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
+RequestItem.displayName = "RequestItem";
 
 export default function AddFriendModal({
   isOpen,
@@ -191,20 +244,22 @@ export default function AddFriendModal({
   }, [activeTab, statusFilter, apiCall]);
 
   // Refetch requests when tab or status filter changes
+  // FIXED: Remove fetchRequests from dependencies to prevent infinite loop
   useEffect(() => {
     if (view === "view") {
       setRequestsOffset(0);
       fetchRequests(0, true);
     }
-  }, [activeTab, statusFilter, view, fetchRequests]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, statusFilter, view]);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     const newOffset = requestsOffset + 5;
     fetchRequests(newOffset, false);
-  };
+  }, [requestsOffset, fetchRequests]);
 
-  // Handle managing friend requests (accept/reject)
-  const handleManageFriendRequest = async (requestId, status) => {
+  // Handle managing friend requests (accept/reject) - memoized
+  const handleManageFriendRequest = useCallback(async (requestId, status) => {
     try {
       const response = await apiCall(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/friends/manage-request`,
@@ -232,7 +287,7 @@ export default function AddFriendModal({
     } catch (error) {
       console.error("Error managing friend request:", error);
     }
-  };
+  }, [apiCall, fetchRequests]);
 
   if (!isOpen) return null;
 
@@ -478,55 +533,12 @@ export default function AddFriendModal({
               ) : (
                 <>
                   {requests.map((request) => (
-                    <div
+                    <RequestItem
                       key={request.id}
-                      className="p-3 bg-[#2a2d2e] border border-[#3e3e42] rounded-lg"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-[#d4d4d4]">
-                            {request.user_name}
-                          </div>
-                        </div>
-                        
-                        {/* Status Badge */}
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                            request.status === "pending"
-                              ? "bg-yellow-900/30 text-yellow-400 border border-yellow-700/50"
-                              : request.status === "accepted"
-                              ? "bg-green-900/30 text-green-400 border border-green-700/50"
-                              : "bg-red-900/30 text-red-400 border border-red-700/50"
-                          }`}
-                        >
-                          {request.status.charAt(0).toUpperCase() +
-                            request.status.slice(1)}
-                        </span>
-                      </div>
-
-                      {/* Action Buttons - Only show for pending received requests */}
-                      {activeTab === "received" &&
-                        request.status === "pending" && (
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => {
-                                handleManageFriendRequest(request.id, "accepted");
-                              }}
-                              className="flex-1 px-3 py-1.5 bg-gray-600 text-white text-xs font-semibold rounded hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
-                            >
-                              <Check size={15} /> Accept
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleManageFriendRequest(request.id, "rejected");
-                              }}
-                              className="flex-1 px-3 py-1.5 border border-[#3e3e42] text-gray-100 text-xs font-semibold rounded hover:bg-[#3e3e42] transition-colors flex items-center justify-center gap-1"
-                            >
-                              <X size={15} /> Reject
-                            </button>
-                          </div>
-                        )}
-                    </div>
+                      request={request}
+                      activeTab={activeTab}
+                      onManageRequest={handleManageFriendRequest}
+                    />
                   ))}
 
                   {/* Load More Button */}
