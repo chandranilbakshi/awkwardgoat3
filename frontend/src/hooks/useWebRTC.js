@@ -396,6 +396,18 @@ export function useWebRTC(sendWSMessage) {
 
   const declineCall = useCallback(() => {
     toast("Call declined");
+    
+    // Send call-end message to backend
+    if (otherUser && user) {
+      sendWSMessage({
+        type: "call-end",
+        payload: {
+          sender_id: user.id,
+          receiver_id: otherUser.id,
+        },
+      });
+    }
+    
     pendingOfferRef.current = null;
     setCallState("idle");
     setOtherUser(null);

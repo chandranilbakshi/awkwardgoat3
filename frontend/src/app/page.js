@@ -180,6 +180,18 @@ export default function ChatPage() {
         handleIncomingAnswer(messagePayload);
       } else if (messageType === "ice-candidate") {
         handleIncomingIceCandidate(messagePayload);
+      } else if (messageType === "call-error") {
+        const { reason, receiver_id } = messagePayload;
+        if (reason === "user_offline") {
+          toast.error("User is offline");
+        } else if (reason === "user_busy") {
+          toast.error("User is busy on another call");
+        } else if (reason === "delivery_failed") {
+          toast.error("Failed to reach user");
+        }
+      } else if (messageType === "call-end") {
+        // Other party ended the call
+        endCall();
       }
       // Chat messages will be handled by OpenChat component through the passed addMessageHandler
     });
