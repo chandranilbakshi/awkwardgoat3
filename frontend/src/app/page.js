@@ -1,15 +1,15 @@
 "use client";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
-const AddFriendModal = dynamic(() => import('@/components/AddFriendModal'), {
+const AddFriendModal = dynamic(() => import("@/components/AddFriendModal"), {
   ssr: false,
 });
 
-const CallModal = dynamic(() => import('@/components/CallModal'), {
+const CallModal = dynamic(() => import("@/components/CallModal"), {
   ssr: false,
 });
 
-const OpenChat = dynamic(() => import('@/components/OpenChat'), {
+const OpenChat = dynamic(() => import("@/components/OpenChat"), {
   ssr: false,
 });
 
@@ -178,6 +178,18 @@ export default function ChatPage() {
         handleIncomingOffer(messagePayload);
       } else if (messageType === "call-answer") {
         handleIncomingAnswer(messagePayload);
+      } else if (messageType === "call-error") {
+        const { reason, receiver_id } = messagePayload;
+        if (reason === "user_offline") {
+          toast.error("User is offline");
+        } else if (reason === "user_busy") {
+          toast.error("User is busy on another call");
+        } else if (reason === "delivery_failed") {
+          toast.error("Failed to reach user");
+        }
+      } else if (messageType === "call-end") {
+        // Other party ended the call
+        endCall();
       } else if (messageType === "ice-candidate") {
         handleIncomingIceCandidate(messagePayload);
       } else if (messageType === "call-error") {
@@ -198,10 +210,7 @@ export default function ChatPage() {
 
     return removeHandler;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    user,
-    addMessageHandler,
-  ]);
+  }, [user, addMessageHandler]);
 
   // ESC key handler
   useEffect(() => {
