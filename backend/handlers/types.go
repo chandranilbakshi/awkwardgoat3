@@ -46,6 +46,8 @@ type Client struct {
 	UserID string
 	Conn   *websocket.Conn
 	Send   chan []byte
+	State  ClientState
+	mu     sync.RWMutex // protects State
 }
 
 // Hub maintains active clients and broadcasts messages
@@ -57,6 +59,15 @@ type Hub struct {
 	mu         sync.RWMutex
 }
 
+// ClientState represents the current call state of a client
+type ClientState string
+
+const (
+	StateIdle    ClientState = "idle"    // Can receive calls
+	StateCalling ClientState = "calling" // Initiating or receiving a call (ringing)
+	StateInCall  ClientState = "in_call" // Currently in an active call
+)
+
 // Message type constants
 const (
 	MessageTypeChat         = "chat"
@@ -64,6 +75,7 @@ const (
 	MessageTypeCallAnswer   = "call-answer"
 	MessageTypeIceCandidate = "ice-candidate"
 	MessageTypeCallError    = "call-error"
+	MessageTypeCallEnd      = "call-end"
 )
 
 // WebSocketMessage wraps all WebSocket message types
@@ -124,4 +136,16 @@ type IceCandidate struct {
 	Candidate string  `json:"candidate"`
 	SdpMid    *string `json:"sdpMid,omitempty"`
 	SdpIndex  *uint16 `json:"sdpIndex,omitempty"`
+}
+
+// CallErrorResponse represents error messages sent back to clients
+type CallErrorResponse struct {
+	Reason     string `json:"reason"`      // "user_offline", "user_busy", "delivery_failed"
+	ReceiverID string `json:"receiver_id"` // Who we tried to call
+}
+
+// CallEnd represents a call termination message
+type CallEnd struct {
+	SenderID   string `json:"sender_id"`
+	ReceiverID string `json:"receiver_id"`
 }

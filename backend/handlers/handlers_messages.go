@@ -137,6 +137,7 @@ func HandleWebSocket(c *websocket.Conn) {
 		UserID: userID,
 		Conn:   c,
 		Send:   make(chan []byte, 256),
+		State:  StateIdle, // New connections start in idle state
 	}
 
 	hub.register <- client
@@ -217,6 +218,18 @@ func (c *Client) readPump() {
 			err = HandleIceCandidate(hub, c, &iceCandidate)
 			if err != nil {
 				log.Printf("Error handling ICE candidate: %v", err)
+			}
+
+		case MessageTypeCallEnd:
+			var callEnd CallEnd
+			err := json.Unmarshal(wsMsg.Payload, &callEnd)
+			if err != nil {
+				log.Printf("Error unmarshaling call-end: %v", err)
+				continue
+			}
+			err = HandleCallEnd(hub, c, &callEnd)
+			if err != nil {
+				log.Printf("Error handling call-end: %v", err)
 			}
 
 		default:

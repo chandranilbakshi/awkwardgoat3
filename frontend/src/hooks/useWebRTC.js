@@ -349,11 +349,23 @@ export function useWebRTC(sendWSMessage) {
   const declineCall = useCallback(() => {
     console.log("❌ Call declined");
     toast("Call declined");
+    
+    // Send call-end message to backend
+    if (otherUser && user) {
+      sendWSMessage({
+        type: "call-end",
+        payload: {
+          sender_id: user.id,
+          receiver_id: otherUser.id,
+        },
+      });
+    }
+    
     pendingOfferRef.current = null;
     setCallState("idle");
     setOtherUser(null);
     cleanup();
-  }, []);
+  }, [otherUser, user, sendWSMessage]);
 
   // ============================================
   // END CALL
@@ -361,13 +373,25 @@ export function useWebRTC(sendWSMessage) {
   const endCall = useCallback(() => {
     console.log("📴 Ending call");
     toast("Call ended");
+    
+    // Send call-end message to backend
+    if (otherUser && user) {
+      sendWSMessage({
+        type: "call-end",
+        payload: {
+          sender_id: user.id,
+          receiver_id: otherUser.id,
+        },
+      });
+    }
+    
     stopCallTimer();
     releaseWakeLock();
     setCallState("idle");
     setOtherUser(null);
     pendingOfferRef.current = null;
     cleanup();
-  }, [stopCallTimer, releaseWakeLock]);
+  }, [stopCallTimer, releaseWakeLock, otherUser, user, sendWSMessage]);
 
   // ============================================
   // CLEANUP
