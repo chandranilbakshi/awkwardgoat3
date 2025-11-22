@@ -233,13 +233,25 @@ export function useWebRTC(sendWSMessage) {
   const endCall = useCallback(() => {
     console.log("📴 Ending call");
     toast("Call ended");
+    
+    // Send call-end message to backend
+    if (otherUser && user) {
+      sendWSMessage({
+        type: "call-end",
+        payload: {
+          sender_id: user.id,
+          receiver_id: otherUser.id,
+        },
+      });
+    }
+    
     stopCallTimer();
     releaseWakeLock();
     setCallState("idle");
     setOtherUser(null);
     pendingOfferRef.current = null;
     cleanup();
-  }, [stopCallTimer, releaseWakeLock, cleanup]);
+  }, [stopCallTimer, releaseWakeLock, cleanup, otherUser, user, sendWSMessage]);
 
   // ============================================
   // PEER CONNECTION
@@ -396,11 +408,23 @@ export function useWebRTC(sendWSMessage) {
 
   const declineCall = useCallback(() => {
     toast("Call declined");
+    
+    // Send call-end message to backend
+    if (otherUser && user) {
+      sendWSMessage({
+        type: "call-end",
+        payload: {
+          sender_id: user.id,
+          receiver_id: otherUser.id,
+        },
+      });
+    }
+    
     pendingOfferRef.current = null;
     setCallState("idle");
     setOtherUser(null);
     cleanup();
-  }, [cleanup]);
+  }, [cleanup, otherUser, user, sendWSMessage]);
 
   // ============================================
   // TOGGLE MUTE
