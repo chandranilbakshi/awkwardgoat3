@@ -1,5 +1,6 @@
 "use client";
-import { useState, useRef, useEffect, Fragment, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Phone,
   Video,
@@ -17,8 +18,11 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-  const messagesEndRef = useRef(null);
   const textAreaRef = useRef(null);
+  
+  // Refs for virtual scrolling
+  const mobileScrollRef = useRef(null);
+  const desktopScrollRef = useRef(null);
 
   // Messages
   const { messages, addMessage, loading } = useMessages(selectedFriend?.fid);
@@ -77,11 +81,6 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
 
     return removeHandler;
   }, [selectedFriend, addMessageHandler, addMessage, user?.id]);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   // Memoize handlers to prevent recreation on every render
   const handleSendMessage = useCallback(() => {
@@ -204,6 +203,44 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
     }
   }, [selectedFriend, onStartCall]);
 
+  // Virtual scrolling for mobile
+  const mobileVirtualizer = useVirtualizer({
+    count: processedMessages.length,
+    getScrollElement: () => mobileScrollRef.current,
+    estimateSize: () => 80, // Estimated height per message
+    overscan: 5, // Render 5 extra items above/below viewport
+  });
+
+  // Virtual scrolling for desktop
+  const desktopVirtualizer = useVirtualizer({
+    count: processedMessages.length,
+    getScrollElement: () => desktopScrollRef.current,
+    estimateSize: () => 80, // Estimated height per message
+    overscan: 5, // Render 5 extra items above/below viewport
+  });
+
+  // Auto-scroll to bottom when new messages arrive (for virtual lists)
+  // Track previous message count
+const prevMessageCountRef = useRef(0);
+
+useEffect(() => {
+  // Only scroll if new messages were added
+  if (processedMessages.length > prevMessageCountRef.current) {
+    const virtualizer = isMobile ? mobileVirtualizer : desktopVirtualizer;
+    
+    // Small delay to ensure DOM is updated
+    setTimeout(() => {
+      virtualizer.scrollToIndex(processedMessages.length - 1, {
+        align: 'end',
+        behavior: 'smooth',
+      });
+    }, 50);
+  }
+  
+  prevMessageCountRef.current = processedMessages.length;
+}, [processedMessages.length, isMobile]);
+// ✅ Remove virtualizers from deps
+
   if (!selectedFriend) {
     return (
       <div className="hidden md:flex flex-1 bg-[#252526] border border-[#3e3e42] rounded-2xl p-4 items-center justify-center">
@@ -238,6 +275,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
 
         {/* Mobile Messages Area - Full height, scrolls under header */}
         <div 
+          ref={mobileScrollRef}
           className={`absolute inset-0 overflow-y-auto px-4 pb-24 ${
             callState && callState !== "idle" ? "pt-28" : "pt-20"
           }`}
@@ -258,41 +296,62 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
               </div>
             </div>
           ) : (
-            processedMessages.map((msg, index) => (
-              <Fragment key={`${msg.id}-${index}`}>
-                {msg.showDate && (
-                  <div className="flex justify-center my-3">
-                    <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
-                      {msg.formattedDate}
-                    </span>
-                  </div>
-                )}
-                <div
-                  className={`flex ${
-                    msg.isOwn ? 'justify-end' : 'justify-start'
-                  } ${msg.isSameSender ? 'mt-1' : 'mt-3'}`}
-                >
+            <div
+              style={{
+                height: `${mobileVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {mobileVirtualizer.getVirtualItems().map((virtualRow) => {
+                const msg = processedMessages[virtualRow.index];
+                return (
                   <div
-                  className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
-                    msg.isOwn
-                      ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
-                      : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
-                  }`}
-                >
-                    <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
-                  <p
-                    className={`flex items-end text-xs mt-1 ${
-                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
-                    }`}
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={mobileVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                   >
-                    {msg.formattedTime}
-                  </p>
+                    {msg.showDate && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
+                          {msg.formattedDate}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`flex ${
+                        msg.isOwn ? 'justify-end' : 'justify-start'
+                      } ${msg.isSameSender ? 'mt-1' : 'mt-3'}`}
+                    >
+                      <div
+                        className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
+                          msg.isOwn
+                            ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
+                            : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
+                        }`}
+                      >
+                        <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
+                        <p
+                          className={`flex items-end text-xs mt-1 ${
+                            msg.isOwn ? "text-gray-100" : "text-[#858585]"
+                          }`}
+                        >
+                          {msg.formattedTime}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </Fragment>
-            ))
+                );
+              })}
+            </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Mobile Top Bar - Fixed on top with blur */}
@@ -348,7 +407,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
-              className="flex-1 bg-transparent resize-none outline-none max-h-[120px] text-[#d4d4d4] placeholder-[#858585]"
+              className="flex-1 resize-none outline-none max-h-[120px] text-[#d4d4d4] placeholder-[#858585]"
               rows="1"
             />
 
@@ -422,6 +481,7 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
 
     {/* Desktop Messages Area */}
     <div
+      ref={desktopScrollRef}
       className="flex-1 overflow-y-auto px-4 py-20"
       style={{
         scrollbarWidth: 'thin',
@@ -455,41 +515,62 @@ export default function OpenChat({ selectedFriend, onClose, isMobile, onStartCal
           </div>
         </div>
       ) : (
-        processedMessages.map((msg, index) => (
-          <Fragment key={`${msg.id}-${index}`}>
-            {msg.showDate && (
-              <div className="flex justify-center my-3">
-                <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
-                  {msg.formattedDate}
-                </span>
-              </div>
-            )}
-            <div
-              className={`flex ${
-                msg.isOwn ? 'justify-end' : 'justify-start'
-              } ${msg.isSameSender ? 'mt-1' : 'mt-4'}`}
-            >
+        <div
+          style={{
+            height: `${desktopVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {desktopVirtualizer.getVirtualItems().map((virtualRow) => {
+            const msg = processedMessages[virtualRow.index];
+            return (
               <div
-                className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
-                    msg.isOwn
-                      ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
-                      : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
-                  }`}
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={desktopVirtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
               >
-                <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
-                <p
-                    className={`flex items-end text-xs mt-1 ${
-                      msg.isOwn ? "text-gray-100" : "text-[#858585]"
-                    }`}
+                {msg.showDate && (
+                  <div className="flex justify-center my-3">
+                    <span className="text-xs text-[#858585] bg-[#2a2d2e] px-2 py-1 rounded-full border border-[#3e3e42]">
+                      {msg.formattedDate}
+                    </span>
+                  </div>
+                )}
+                <div
+                  className={`flex ${
+                    msg.isOwn ? 'justify-end' : 'justify-start'
+                  } ${msg.isSameSender ? 'mt-1' : 'mt-4'}`}
+                >
+                  <div
+                    className={`flex flex-row gap-2 max-w-xs lg:max-w-md p-2 ${
+                        msg.isOwn
+                          ? `bg-gray-600 text-white ${msg.isSameSender ? "rounded-xl" : "rounded-tl-xl rounded-bl-xl rounded-br-xl"}`
+                          : `bg-[#3e3e42] text-[#d4d4d4] border border-[#505050] ${msg.isSameSender ? "rounded-xl" : "rounded-tr-xl rounded-br-xl rounded-bl-xl"}`
+                      }`}
                   >
-                    {msg.formattedTime}
-                  </p>
+                    <p className="break-all" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.text}</p>
+                    <p
+                        className={`flex items-end text-xs mt-1 ${
+                          msg.isOwn ? "text-gray-100" : "text-[#858585]"
+                        }`}
+                      >
+                        {msg.formattedTime}
+                      </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </Fragment>
-        ))
+            );
+          })}
+        </div>
       )}
-      <div ref={messagesEndRef} />
     </div>
 
     {/* Desktop Input Bar */}
