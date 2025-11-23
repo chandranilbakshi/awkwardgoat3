@@ -268,6 +268,11 @@ export function useWebRTC(sendWSMessage) {
             username: process.env.NEXT_PUBLIC_TURN_USERNAME,
             credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
           },
+          {
+            urls: "turn:zibro.live:3478?transport=tcp",
+            username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+            credential: process.env.NEXT_PUBLIC_TURN_CREDENTIALS,
+          },
         ],
       });
 

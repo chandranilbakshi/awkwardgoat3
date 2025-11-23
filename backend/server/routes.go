@@ -22,6 +22,7 @@ func SetupRoutes(app *fiber.App) {
 	app.Post("/api/auth/signup", handlers.HandleSignup)
 	app.Post("/api/auth/refresh", handlers.HandleRefreshToken)
 	app.Get("/api/auth/me", handlers.HandleGetUser)
+	app.Post("/api/auth/logout", handlers.HandleLogout)
 
 	// Profile routes
 	app.Post("/api/user/create-profile", handlers.HandleCreateProfile)

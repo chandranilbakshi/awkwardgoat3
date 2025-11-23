@@ -112,3 +112,43 @@ func HandleGetUser(c *fiber.Ctx) error {
 		"user": user,
 	})
 }
+
+func HandleLogout(c *fiber.Ctx) error {
+	// Get the authorization header
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization header is required",
+		})
+	}
+
+	// Extract the token (format: "Bearer <token>")
+	token := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	// Create authenticated client with user's token
+	client := authClient.WithToken(token)
+
+	// Call Supabase logout to revoke all refresh tokens
+	// This is important - it invalidates refresh tokens on the server side
+	err := client.Logout()
+	if err != nil {
+		log.Printf("Supabase logout error: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to logout from authentication server",
+			"details": err.Error(),
+		})
+	}
+
+	log.Printf("User logged out successfully - refresh tokens revoked")
+
+	// Return success
+	// Note: JWT access tokens will still be valid until they expire (stateless auth)
+	// WebSocket cleanup happens automatically when connection closes
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "Logged out successfully",
+	})
+}

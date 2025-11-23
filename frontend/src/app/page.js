@@ -18,7 +18,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
-import { Ellipsis, Plus } from "lucide-react";
+import { Ellipsis, Plus, LogOut } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 
@@ -42,11 +42,11 @@ export default function ChatPage() {
   const buttonRef = useRef(null);
   const containerRef = useRef(null);
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { apiCall } = useApi();
 
   // WebSocket and WebRTC for global call handling (must be called before any conditional returns)
-  const { sendMessage: sendWSMessage, addMessageHandler } = useWebSocket();
+  const { sendMessage: sendWSMessage, addMessageHandler, disconnect } = useWebSocket();
   const {
     callState,
     otherUser,
@@ -102,6 +102,27 @@ export default function ChatPage() {
       setIsLoadingFriends(false);
     }
   }, [user, apiCall]);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Call backend logout endpoint
+      await apiCall(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/auth/logout`,
+        {
+          method: "POST",
+        }
+      );
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Continue with logout even if backend call fails
+    } finally {
+      // Disconnect WebSocket
+      disconnect();
+      // Clear auth data and redirect
+      logout();
+    }
+  };
 
   // Handle call initiation from OpenChat
   const handleStartCall = useCallback(
@@ -373,7 +394,24 @@ export default function ChatPage() {
               minWidth: !isMobile ? "300px" : "auto",
             }}
           >
-            <h2 className="text-xl font-bold text-[#d4d4d4] mb-4">Chats</h2>
+            {/* Chats Header with Logout Button */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-[#d4d4d4]">Chats</h2>
+              <button
+                onClick={handleLogout}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleLogout();
+                  }
+                }}
+                className="p-2 hover:opacity-70 transition-opacity cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-400 rounded"
+                aria-label="Logout"
+                tabIndex={0}
+              >
+                <LogOut className="h-5 w-5 text-[#d4d4d4]" />
+              </button>
+            </div>
 
             {/* Friends List */}
             <div className="flex-1 overflow-y-auto">
