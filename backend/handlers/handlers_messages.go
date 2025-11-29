@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"athena-backend/utils"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
+
+// Shared HTTP client with connection pooling for better performance
+// This reuses TCP connections instead of creating new ones for each request
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+	},
+	Timeout: 30 * time.Second,
+}
 
 var hub = &Hub{
 	clients:    make(map[string]*Client),
@@ -104,8 +116,8 @@ func storeMessage(msg *Message) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Prefer", "return=minimal")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Use shared HTTP client with connection pooling
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -265,11 +277,8 @@ func HandleGetMessageHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token (format: "Bearer <token>")
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Verify token and get user
 	client := authClient.WithToken(token)
@@ -322,7 +331,7 @@ func HandleGetMessageHistory(c *fiber.Ctx) error {
 	req.Header.Set("apikey", supabaseKey)
 	req.Header.Set("Authorization", "Bearer "+supabaseKey)
 
-	httpClient := &http.Client{}
+	// Use shared HTTP client with connection pooling
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("Error fetching messages: %v", err)

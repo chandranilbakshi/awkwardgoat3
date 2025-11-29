@@ -127,20 +127,37 @@ export function updateLastSyncTime(userId1, userId2, timestamp = new Date()) {
 /**
  * Merge new messages with existing messages
  * Removes duplicates based on message ID and sorts by timestamp
+ * Optimized to handle large message sets efficiently
  */
 export function mergeMessages(existingMessages, newMessages) {
+  // Fast path: if no existing messages, just sort new messages
+  if (!existingMessages || existingMessages.length === 0) {
+    const sorted = [...newMessages];
+    sorted.sort((a, b) => {
+      const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+      return timeA - timeB;
+    });
+    return sorted;
+  }
+
+  // Fast path: if no new messages, return existing
+  if (!newMessages || newMessages.length === 0) {
+    return existingMessages;
+  }
+
   // Create a map to track unique messages by ID
   const messageMap = new Map();
   
   // Add existing messages
-  existingMessages.forEach(msg => {
-    messageMap.set(msg.id, msg);
-  });
+  for (let i = 0; i < existingMessages.length; i++) {
+    messageMap.set(existingMessages[i].id, existingMessages[i]);
+  }
   
   // Add/update with new messages
-  newMessages.forEach(msg => {
-    messageMap.set(msg.id, msg);
-  });
+  for (let i = 0; i < newMessages.length; i++) {
+    messageMap.set(newMessages[i].id, newMessages[i]);
+  }
   
   // Convert back to array and sort by timestamp
   const merged = Array.from(messageMap.values());

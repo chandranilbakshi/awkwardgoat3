@@ -17,9 +17,9 @@ export function useWebSocket() {
   const tokenRefreshAttemptedRef = useRef(false);
 
   // Exponential backoff calculation (1s, 2s, 4s, 8s, 16s, max 30s)
+  // Using a function instead of useMemo since the value depends on a ref that changes
   const getReconnectDelay = useCallback(() => {
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-    return delay;
+    return Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
   }, []);
 
   const connect = useCallback(async () => {
