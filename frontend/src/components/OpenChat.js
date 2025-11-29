@@ -405,7 +405,7 @@ useEffect(() => {
               ref={textAreaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               placeholder="Type a message..."
               className="flex-1 resize-none outline-none max-h-[120px] text-[#d4d4d4] placeholder-[#858585]"
               rows="1"
@@ -587,7 +587,7 @@ useEffect(() => {
           ref={textAreaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           placeholder="Type a message..."
           className="flex-1 resize-none outline-none max-h-[120px] text-[#d4d4d4] placeholder-[#858585]"
           rows="1"

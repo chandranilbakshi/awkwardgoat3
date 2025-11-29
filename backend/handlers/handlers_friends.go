@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"athena-backend/utils"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,11 +36,8 @@ func HandleSendFriendRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Get current user info
 	client := authClient.WithToken(token)
@@ -157,11 +156,8 @@ func HandleViewFriendRequests(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Get current user info
 	client := authClient.WithToken(token)
@@ -192,107 +188,130 @@ func HandleViewFriendRequests(c *fiber.Ctx) error {
 
 	var formattedReceived []fiber.Map
 	var formattedSent []fiber.Map
+	var receivedErr, sentErr error
+
+	// Use WaitGroup for parallel fetching when both types are needed
+	var wg sync.WaitGroup
 
 	// Fetch received requests if requested
 	if typeFilter == "received" || typeFilter == "both" {
-		receivedURL := supabaseURL + "/rest/v1/friend_requests?to_user_id=eq." + userID + statusQuery +
-			"&select=id,status,created_at,from_user:user_profiles!friend_requests_from_user_id_fkey1(name)" +
-			"&order=created_at.desc&offset=" + offsetParam + "&limit=" + limitParam
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		receivedReq, err := http.NewRequest("GET", receivedURL, nil)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to fetch received requests",
-			})
-		}
+			receivedURL := supabaseURL + "/rest/v1/friend_requests?to_user_id=eq." + userID + statusQuery +
+				"&select=id,status,created_at,from_user:user_profiles!friend_requests_from_user_id_fkey1(name)" +
+				"&order=created_at.desc&offset=" + offsetParam + "&limit=" + limitParam
 
-		receivedReq.Header.Set("apikey", supabaseKey)
-		receivedReq.Header.Set("Authorization", "Bearer "+token)
+			receivedReq, err := http.NewRequest("GET", receivedURL, nil)
+			if err != nil {
+				receivedErr = err
+				return
+			}
 
-		receivedResp, err := http.DefaultClient.Do(receivedReq)
-		if err != nil {
-			log.Printf("Error fetching received requests: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to fetch received requests",
-			})
-		}
-		defer receivedResp.Body.Close()
+			receivedReq.Header.Set("apikey", supabaseKey)
+			receivedReq.Header.Set("Authorization", "Bearer "+token)
 
-		receivedBody, _ := io.ReadAll(receivedResp.Body)
+			receivedResp, err := http.DefaultClient.Do(receivedReq)
+			if err != nil {
+				log.Printf("Error fetching received requests: %v", err)
+				receivedErr = err
+				return
+			}
+			defer receivedResp.Body.Close()
 
-		if receivedResp.StatusCode != 200 {
-			log.Printf("Supabase error (received): %s", string(receivedBody))
-			return c.Status(receivedResp.StatusCode).JSON(fiber.Map{
-				"error": "Failed to fetch received requests",
-			})
-		}
+			receivedBody, _ := io.ReadAll(receivedResp.Body)
 
-		var receivedRequests []map[string]interface{}
-		json.Unmarshal(receivedBody, &receivedRequests)
+			if receivedResp.StatusCode != 200 {
+				log.Printf("Supabase error (received): %s", string(receivedBody))
+				receivedErr = fmt.Errorf("supabase returned status %d", receivedResp.StatusCode)
+				return
+			}
 
-		// Format the received requests
-		formattedReceived = make([]fiber.Map, 0, len(receivedRequests))
-		for _, req := range receivedRequests {
-			fromUser := req["from_user"].(map[string]interface{})
-			formattedReceived = append(formattedReceived, fiber.Map{
-				"id":         req["id"],
-				"user_name":  fromUser["name"],
-				"status":     req["status"],
-				"created_at": req["created_at"],
-				"direction":  "received",
-			})
-		}
+			var receivedRequests []map[string]interface{}
+			json.Unmarshal(receivedBody, &receivedRequests)
+
+			// Format the received requests
+			formattedReceived = make([]fiber.Map, 0, len(receivedRequests))
+			for _, req := range receivedRequests {
+				fromUser := req["from_user"].(map[string]interface{})
+				formattedReceived = append(formattedReceived, fiber.Map{
+					"id":         req["id"],
+					"user_name":  fromUser["name"],
+					"status":     req["status"],
+					"created_at": req["created_at"],
+					"direction":  "received",
+				})
+			}
+		}()
 	}
 
 	// Fetch sent requests if requested
 	if typeFilter == "sent" || typeFilter == "both" {
-		sentURL := supabaseURL + "/rest/v1/friend_requests?from_user_id=eq." + userID + statusQuery +
-			"&select=id,status,created_at,to_user:user_profiles!friend_requests_to_user_id_fkey1(name)" +
-			"&order=created_at.desc&offset=" + offsetParam + "&limit=" + limitParam
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		sentReq, err := http.NewRequest("GET", sentURL, nil)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to fetch sent requests",
-			})
-		}
+			sentURL := supabaseURL + "/rest/v1/friend_requests?from_user_id=eq." + userID + statusQuery +
+				"&select=id,status,created_at,to_user:user_profiles!friend_requests_to_user_id_fkey1(name)" +
+				"&order=created_at.desc&offset=" + offsetParam + "&limit=" + limitParam
 
-		sentReq.Header.Set("apikey", supabaseKey)
-		sentReq.Header.Set("Authorization", "Bearer "+token)
+			sentReq, err := http.NewRequest("GET", sentURL, nil)
+			if err != nil {
+				sentErr = err
+				return
+			}
 
-		sentResp, err := http.DefaultClient.Do(sentReq)
-		if err != nil {
-			log.Printf("Error fetching sent requests: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to fetch sent requests",
-			})
-		}
-		defer sentResp.Body.Close()
+			sentReq.Header.Set("apikey", supabaseKey)
+			sentReq.Header.Set("Authorization", "Bearer "+token)
 
-		sentBody, _ := io.ReadAll(sentResp.Body)
+			sentResp, err := http.DefaultClient.Do(sentReq)
+			if err != nil {
+				log.Printf("Error fetching sent requests: %v", err)
+				sentErr = err
+				return
+			}
+			defer sentResp.Body.Close()
 
-		if sentResp.StatusCode != 200 {
-			log.Printf("Supabase error (sent): %s", string(sentBody))
-			return c.Status(sentResp.StatusCode).JSON(fiber.Map{
-				"error": "Failed to fetch sent requests",
-			})
-		}
+			sentBody, _ := io.ReadAll(sentResp.Body)
 
-		var sentRequests []map[string]interface{}
-		json.Unmarshal(sentBody, &sentRequests)
+			if sentResp.StatusCode != 200 {
+				log.Printf("Supabase error (sent): %s", string(sentBody))
+				sentErr = fmt.Errorf("supabase returned status %d", sentResp.StatusCode)
+				return
+			}
 
-		// Format the sent requests
-		formattedSent = make([]fiber.Map, 0, len(sentRequests))
-		for _, req := range sentRequests {
-			toUser := req["to_user"].(map[string]interface{})
-			formattedSent = append(formattedSent, fiber.Map{
-				"id":         req["id"],
-				"user_name":  toUser["name"],
-				"status":     req["status"],
-				"created_at": req["created_at"],
-				"direction":  "sent",
-			})
-		}
+			var sentRequests []map[string]interface{}
+			json.Unmarshal(sentBody, &sentRequests)
+
+			// Format the sent requests
+			formattedSent = make([]fiber.Map, 0, len(sentRequests))
+			for _, req := range sentRequests {
+				toUser := req["to_user"].(map[string]interface{})
+				formattedSent = append(formattedSent, fiber.Map{
+					"id":         req["id"],
+					"user_name":  toUser["name"],
+					"status":     req["status"],
+					"created_at": req["created_at"],
+					"direction":  "sent",
+				})
+			}
+		}()
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Check for errors
+	if receivedErr != nil && (typeFilter == "received" || typeFilter == "both") {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch received requests",
+		})
+	}
+	if sentErr != nil && (typeFilter == "sent" || typeFilter == "both") {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch sent requests",
+		})
 	}
 
 	response := fiber.Map{
@@ -346,11 +365,8 @@ func HandleManageFriendRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Get current user info
 	client := authClient.WithToken(token)
@@ -522,11 +538,8 @@ func HandleLoadFriends(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Get current user info
 	client := authClient.WithToken(token)

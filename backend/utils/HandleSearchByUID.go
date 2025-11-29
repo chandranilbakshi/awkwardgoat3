@@ -26,11 +26,8 @@ func HandleSearchByUID(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := ExtractBearerToken(authHeader)
 
 	// Verify user is authenticated
 	client := authClient.WithToken(token)

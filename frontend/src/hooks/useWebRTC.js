@@ -489,7 +489,7 @@ export function useWebRTC(sendWSMessage) {
         );
       }
     },
-    [endCall]
+    []
   );
 
   // ============================================

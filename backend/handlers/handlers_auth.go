@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"athena-backend/utils"
 	"log"
 	"os"
 
@@ -90,11 +91,8 @@ func HandleGetUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token (format: "Bearer <token>")
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Get user info using the token
 	client := authClient.WithToken(token)
@@ -122,11 +120,8 @@ func HandleLogout(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract the token (format: "Bearer <token>")
-	token := authHeader
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		token = authHeader[7:]
-	}
+	// Extract the token using helper function
+	token := utils.ExtractBearerToken(authHeader)
 
 	// Create authenticated client with user's token
 	client := authClient.WithToken(token)
