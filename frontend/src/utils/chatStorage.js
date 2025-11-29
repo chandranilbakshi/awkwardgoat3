@@ -125,6 +125,14 @@ export function updateLastSyncTime(userId1, userId2, timestamp = new Date()) {
 }
 
 /**
+ * Helper function to convert timestamp to Date object
+ * Handles both Date objects and string timestamps
+ */
+function toDate(timestamp) {
+  return timestamp instanceof Date ? timestamp : new Date(timestamp);
+}
+
+/**
  * Merge new messages with existing messages
  * Removes duplicates based on message ID and sorts by timestamp
  * Optimized to handle large message sets efficiently
@@ -133,11 +141,7 @@ export function mergeMessages(existingMessages, newMessages) {
   // Fast path: if no existing messages, just sort new messages
   if (!existingMessages || existingMessages.length === 0) {
     const sorted = [...newMessages];
-    sorted.sort((a, b) => {
-      const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-      const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-      return timeA - timeB;
-    });
+    sorted.sort((a, b) => toDate(a.timestamp) - toDate(b.timestamp));
     return sorted;
   }
 
@@ -161,11 +165,7 @@ export function mergeMessages(existingMessages, newMessages) {
   
   // Convert back to array and sort by timestamp
   const merged = Array.from(messageMap.values());
-  merged.sort((a, b) => {
-    const timeA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-    const timeB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-    return timeA - timeB;
-  });
+  merged.sort((a, b) => toDate(a.timestamp) - toDate(b.timestamp));
   
   return merged;
 }

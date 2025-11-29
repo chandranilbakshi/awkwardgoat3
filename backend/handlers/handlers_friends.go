@@ -4,6 +4,7 @@ import (
 	"athena-backend/utils"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -223,7 +224,7 @@ func HandleViewFriendRequests(c *fiber.Ctx) error {
 
 			if receivedResp.StatusCode != 200 {
 				log.Printf("Supabase error (received): %s", string(receivedBody))
-				receivedErr = err
+				receivedErr = fmt.Errorf("supabase returned status %d", receivedResp.StatusCode)
 				return
 			}
 
@@ -276,7 +277,7 @@ func HandleViewFriendRequests(c *fiber.Ctx) error {
 
 			if sentResp.StatusCode != 200 {
 				log.Printf("Supabase error (sent): %s", string(sentBody))
-				sentErr = err
+				sentErr = fmt.Errorf("supabase returned status %d", sentResp.StatusCode)
 				return
 			}
 
